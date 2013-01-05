@@ -12,17 +12,22 @@
 var game = (function() {
 	var camera,
 		entities = [],
-		ship = null;
+		gfx_ship = null,
+		gfx_ui = null;
 
 	// Constructor
 	function game() {
-		ship = new renderer.spriteSheet($("#img_ship")[0], 50, 100);
+		gfx_ship = new renderer.spriteSheet($("#img_ship")[0], 50, 100);
+		gfx_ui = new renderer.spriteSheet($("#img_interface")[0], 10, 10);
 		
 		entities[0] = new game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
-		entities[0].setSprite(ship.getSprite(0));
+		entities[0].setSprite(gfx_ship.getSprite(0));
 		
 		entities[1] = new game.entity(0, 0);
 		entities[1].setSprite(new renderer.sprite($("#img_planet")[0]));
+		
+		entities[2] = new game.entity(0, 0);
+		entities[2].setSprite(gfx_ui.getSprite(0));
 		
 		camera = new game.physicsEntity(0, -0, 0, 0, 0.25, 0.1);
 	}
@@ -31,9 +36,9 @@ var game = (function() {
 	function handleInput() {
 		if (input.isKeyDown(87)) { // FW
 			entities[0].translate(0.2);
-			entities[0].setSprite(ship.getSprite(1));
+			entities[0].setSprite(gfx_ship.getSprite(1));
 		} else {
-			entities[0].setSprite(ship.getSprite(0));
+			entities[0].setSprite(gfx_ship.getSprite(0));
 		}
 		
 		if (input.isKeyDown(83)) { // BW
@@ -95,12 +100,42 @@ var game = (function() {
 	}
 	
 	function updateCamera() {
+		// camera tracking
 		var x_diff = entities[0].getPosition()[0] - camera.getPosition()[0],
 			y_diff = entities[0].getPosition()[1] - camera.getPosition()[1];
 		
 		camera.applyForce(x_diff * 0.02, y_diff * 0.02);
 		
 		camera.tick();
+	}
+	
+	function offscreenTracker(trackedId) {
+		var x_diff = entities[trackedId].getPosition()[0] - camera.getPosition()[0],
+			y_diff = entities[trackedId].getPosition()[1] - camera.getPosition()[1],
+			offscreen = false;
+		
+		if (x_diff < -390) {
+			x_diff = -390;
+			offscreen = true;
+		} else if (x_diff > 390) {
+			x_diff = 390;
+			offscreen = true;
+		}
+		
+		if (y_diff < -290) {
+			y_diff = -290;
+			offscreen = true;
+		} else if (y_diff > 290) {
+			y_diff = 290;
+			offscreen = true;
+		}
+		
+		if (offscreen) {
+			entities[2].setPosition(x_diff + camera.getPosition()[0], y_diff + camera.getPosition()[1]);
+			entities[2].setSprite(gfx_ui.getSprite(2));
+		} else {
+			entities[2].setSprite(gfx_ui.getSprite(0));
+		}
 	}
 	
 	
@@ -112,6 +147,8 @@ var game = (function() {
 			handleInput();
 			updateEntities();
 			updateCamera();
+			
+			offscreenTracker(1);
 		},
 		
 		getCamera: function() {
