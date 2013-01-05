@@ -27,7 +27,6 @@ var renderer = (function() {
 			cam = scene.getCamera();
 		
 		context.translate(-cam.getPosition()[0], -cam.getPosition()[1]);
-		context.rotate(-cam.getRotation());
 		
 		for (var i = 0; i < ents.length; i++) {
 			// TODO: ota huomioon entityn koko, canvas.w/h * 0.5
@@ -40,7 +39,6 @@ var renderer = (function() {
 			drawEntity(ents[i]);
 		}
 		
-		context.rotate(cam.getRotation());
 		context.translate(cam.getPosition()[0], cam.getPosition()[1]);
 	}
 	

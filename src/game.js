@@ -24,7 +24,7 @@ var game = (function() {
 		entities[1] = new game.entity(0, 0);
 		entities[1].setSprite(new renderer.sprite($("#img_planet")[0]));
 		
-		camera = new game.physicsEntity(0, -0, 0, 0, 0.25, 0.01);
+		camera = new game.physicsEntity(0, -0, 0, 0, 0.25, 0.1);
 	}
 	
 	
@@ -55,10 +55,10 @@ var game = (function() {
 			camera.move(0, -3);
 		}
 		if (input.isKeyDown(39)) { // RT
-			camera.move(3, 0);
+			camera.rotate(0.15);
 		}
 		if (input.isKeyDown(37)) { // LT
-			camera.move(-3, 0);
+			camera.rotate(-0.15);
 		}
 	}
 	
@@ -75,6 +75,8 @@ var game = (function() {
 			}
 			entities[i].tick();
 		}
+		
+		entities[0].applyGravity([0, 0], 50);
 		
 		var coll_sq = lib.collidePointSphere(entities[0].getPosition(), entities[1].getPosition(), 100);
 		if (coll_sq > 0) {
@@ -96,7 +98,7 @@ var game = (function() {
 		var x_diff = entities[0].getPosition()[0] - camera.getPosition()[0],
 			y_diff = entities[0].getPosition()[1] - camera.getPosition()[1];
 		
-		camera.applyForce(x_diff * 0.01, y_diff * 0.01);
+		camera.applyForce(x_diff * 0.02, y_diff * 0.02);
 		
 		camera.tick();
 	}
@@ -277,7 +279,7 @@ game.physicsEntity = function(x, y, x_mom, y_mom, dissipation, decay) {
 		pos[1] += ent.getPosition()[1];
 	}
 	
-	function applyGravity(well, mass) {
+	this.applyGravity = function(well, mass) {
 		var x_dist = pos[0] - well[0],
 			y_dist = pos[1] - well[1],
 			sq_dist = x_dist * x_dist + y_dist * y_dist;
@@ -327,9 +329,8 @@ game.physicsEntity = function(x, y, x_mom, y_mom, dissipation, decay) {
 	}
 	
 	this.tick = function() {
-		applyDecay();
-		applyGravity([0, 0], 50);
 		applyMomentum();
+		applyDecay();
 	}
 	
 	this.alive = ent.alive;
