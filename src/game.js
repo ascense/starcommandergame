@@ -24,7 +24,7 @@ var game = (function() {
 		entities[1] = new game.entity(0, 0);
 		entities[1].setSprite(new renderer.sprite($("#img_planet")[0]));
 		
-		camera = new game.entity(0, -0);
+		camera = new game.physicsEntity(0, -0, 0, 0, 0.25, 0.01);
 	}
 	
 	
@@ -46,6 +46,19 @@ var game = (function() {
 		
 		if (input.isKeyDown(65)) { // LT
 			entities[0].rotate(-0.075);
+		}
+		
+		if (input.isKeyDown(40)) { // UP
+			camera.move(0, 3);
+		}
+		if (input.isKeyDown(38)) { // DOWN
+			camera.move(0, -3);
+		}
+		if (input.isKeyDown(39)) { // RT
+			camera.move(3, 0);
+		}
+		if (input.isKeyDown(37)) { // LT
+			camera.move(-3, 0);
 		}
 	}
 	
@@ -79,6 +92,15 @@ var game = (function() {
 		}
 	}
 	
+	function updateCamera() {
+		var x_diff = entities[0].getPosition()[0] - camera.getPosition()[0],
+			y_diff = entities[0].getPosition()[1] - camera.getPosition()[1];
+		
+		camera.applyForce(x_diff * 0.01, y_diff * 0.01);
+		
+		camera.tick();
+	}
+	
 	
 	// Prototype
 	game.prototype = {
@@ -87,6 +109,7 @@ var game = (function() {
 		tick: function() {
 			handleInput();
 			updateEntities();
+			updateCamera();
 		},
 		
 		getCamera: function() {
@@ -160,6 +183,11 @@ game.entity = function(x, y) {
 	
 	// entities with alive == false will be culled during each tick
 	this.alive = true;
+	
+	this.move = function(x, y) {
+		pos[0] += x;
+		pos[1] += y;
+	}
 	
 	this.translate = function(val) {
 		pos[0] += Math.sin(rot) * val;
@@ -282,6 +310,11 @@ game.physicsEntity = function(x, y, x_mom, y_mom, dissipation, decay) {
 	
 	this.getMomentum = function() {
 		return ent.getPosition();
+	}
+	
+	this.move = function(x, y) {
+		pos[0] += x;
+		pos[1] += y;
 	}
 	
 	this.setPosition = function(x, y) {

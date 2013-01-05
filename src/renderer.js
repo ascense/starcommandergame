@@ -22,6 +22,28 @@ var renderer = (function() {
 		context.clearRect(0, 0, canvas.width, canvas.height);
 	}
 	
+	function drawScene(scene) {
+		var ents = scene.getEntities(),
+			cam = scene.getCamera();
+		
+		context.translate(-cam.getPosition()[0], -cam.getPosition()[1]);
+		context.rotate(-cam.getRotation());
+		
+		for (var i = 0; i < ents.length; i++) {
+			// TODO: ota huomioon entityn koko, canvas.w/h * 0.5
+			if (ents[i].getPosition()[0] - cam.getPosition()[0] < (-canvas.width * 0.65)
+				  || ents[i].getPosition()[0] - cam.getPosition()[0] > (canvas.width * 0.65)
+				  || ents[i].getPosition()[1] - cam.getPosition()[1] < (-canvas.height * 0.65)
+				  || ents[i].getPosition()[1] - cam.getPosition()[1] > (canvas.height * 0.65)) {
+				continue;
+			}
+			drawEntity(ents[i]);
+		}
+		
+		context.rotate(cam.getRotation());
+		context.translate(cam.getPosition()[0], cam.getPosition()[1]);
+	}
+	
 	function drawEntity(entity) {
 		if (entity.getSprite() == null)
 			return;
@@ -64,11 +86,8 @@ var renderer = (function() {
 		
 		draw: function(scene) {
 			drawSpace();
-		
-			var ents = scene.getEntities();
-			for (var i = 0; i < ents.length; i++) {
-				drawEntity(ents[i]);
-			}
+			drawScene(scene);
+			// drawUI();
 		}
 	};
 	
