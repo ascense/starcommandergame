@@ -1,10 +1,16 @@
 body {
 	text-align: center;
+	
+	margin: 20px;
+	
+    color: #666;
+    background: #0F0F0F;
 }
 
 canvas {
 	border-style: solid;
     border-width: 1px;
+	border-color: rgb(55, 55, 55);
     background-color: rgb(0, 0, 0);
 	
     /* pyöreät kulmat */

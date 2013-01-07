@@ -137,6 +137,10 @@ renderer.spriteSheet = function(image, sprite_w, sprite_h) {
 	
 	sprites.length = width / sprite_w * (height / sprite_h);
 	
+	this.length = function() {
+		return sprites.length;
+	}
+	
 	this.getSprite = function(i) {
 		if (i >= sprites.length)
 			return null;

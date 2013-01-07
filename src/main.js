@@ -23,7 +23,6 @@ function init() {
 function tick() {
 	window.requestAnimationFrame(tick);
 	
-	// input.tick();
 	scene.tick();
 	
 	view.draw(scene);
