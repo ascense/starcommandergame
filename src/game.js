@@ -154,13 +154,13 @@ var game = (function() {
 		
 		if (stateData.selectTimer < 20) {
 			if (input.isKeyDown(38) || input.isKeyDown(40)) {
-				if (input.isKeyDown(38)) { // UP
+				if (input.isKeyDown(40)) { // DOWN
 					stateData.selected++;
 					if (stateData.selected > entities.length - 3) {
 						stateData.selected = 0;
 					}
 				}
-				if (input.isKeyDown(40)) { // DOWN
+				if (input.isKeyDown(38)) { // UP
 					stateData.selected--;
 					if (stateData.selected < 0) {
 						stateData.selected = entities.length - 3;
@@ -179,9 +179,9 @@ var game = (function() {
 	function handleMenuPhysics() {
 		for (var i = 0; i < entities.length - 2; i++) {
 			if (stateData.selected == i) { // wobble
-				entities[i + 2].applyGravity([-15 + i * 15, 55 + i * 55], 175, 0.2);
+				entities[i + 2].applyGravity([i * 20, 55 + i * 55], 175, 0.2);
 			} else { // slide
-				entities[i + 2].applyGravity([-15 + i * 15, 55 + i * 55], 150, 0.15);
+				entities[i + 2].applyGravity([i * 20, 55 + i * 55], 150, 0.15);
 			}
 		}
 		
