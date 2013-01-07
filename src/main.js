@@ -1,8 +1,9 @@
 // -- Globals --
 
-var view;
-var scene;
-var input;
+var view,
+	state,
+	game,
+	input;
 
 
 // -- Initialization --
@@ -10,9 +11,12 @@ var input;
 function init() {
 	var canvas = $("#game-canvas")[0];
 	
-	view = new renderer(canvas);
-	scene = new game();
-	input = new controller();
+	view = new View(canvas);
+	state = new State();
+	game = new Game();
+	input = new Input();
+	
+	game.newGame();
 	
 	tick();
 }
@@ -23,7 +27,7 @@ function init() {
 function tick() {
 	window.requestAnimationFrame(tick);
 	
-	scene.tick();
+	game.tick();
 	
-	view.draw(scene);
+	view.draw(game.getScene());
 }

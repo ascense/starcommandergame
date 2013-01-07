@@ -1,15 +1,15 @@
 /**
-* = Controller Module =
+* = Input Module =
 */
 
 
-// -- Controller Module --
+// -- Input Module --
 
-var controller = (function() {
+var Input = (function() {
 	var keys = Array();
 
 	// Constructor
-	function controller() {
+	function _input() {
 		// set listeners
 		$(document).keyup(keyUp);
 		$(document).keydown(keyDown);
@@ -25,8 +25,8 @@ var controller = (function() {
 	}
 	
 	// Prototype
-	controller.prototype = {
-		constructor: controller,
+	_input.prototype = {
+		constructor: _input,
 		
 		tick: function() {
 		},
@@ -40,5 +40,5 @@ var controller = (function() {
 		}
 	};
 	
-	return controller;
+	return _input;
 })();

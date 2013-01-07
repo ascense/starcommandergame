@@ -1,34 +1,36 @@
 /**
-* = Renderer Module =
+* = View Module =
 *
-* renderer
+* View
+*  - View.sprite
+*  - View.spriteSheet
 */
 
 
-// -- Renderer Module --
+// -- View Module --
 
-var renderer = (function() {
+var View = (function() {
 	var canvas,
 		context,
 		sheet_stars;
 
 	// Constructor
-	function renderer(canv) {
+	function _view(canv) {
 		canvas = canv;
 		context = canv.getContext("2d");
 		
-		sheet_stars = new renderer.spriteSheet($("#img_fx")[0], 10, 10);
+		sheet_stars = new View.spriteSheet($("#img_fx")[0], 10, 10);
 	}
 	
 	function drawSpace(scene) {
 		// clear screen
 		context.clearRect(0, 0, canvas.width, canvas.height);
 		
-		if (scene.getState() == game.enumState.GALAXY) {
+		if (state.get() == State.enum.COMBAT) {
 			// draw stars
 			for (var i = 0; i < 6; i++) {
-				var camPos = scene.getCamera().getPosition(),
-					camScale = 1 / (1 + scene.getCamera().getRotation()),
+				var camPos = scene.camera.getPosition(),
+					camScale = 1 / (1 + scene.camera.getRotation()),
 					x_pos = -camPos[0] * (camScale / 4) - (i * i * 221),
 					y_pos = -camPos[1] * (camScale / 4) - (i * i * 349);
 				
@@ -50,8 +52,8 @@ var renderer = (function() {
 	}
 	
 	function drawScene(scene) {
-		var ents = scene.getEntities(),
-			cam = scene.getCamera(),
+		var ents = scene.entities,
+			cam = scene.camera,
 			scale = 1 / (1 + cam.getRotation());
 		
 		context.translate(-cam.getPosition()[0] * scale, -cam.getPosition()[1] * scale);
@@ -67,12 +69,16 @@ var renderer = (function() {
 		}
 		
 		context.translate(cam.getPosition()[0] * scale, cam.getPosition()[1] * scale);
+	}
+	
+	function drawUI(scene) {
+		var ents = scene.uiEntities;
 		
-		ents = scene.getUiEntities();
 		for (var i = 0; i < ents.length; i++) {
 			drawEntity(ents[i], 1);
 		}
 	}
+	
 	
 	function drawEntity(entity, scale) {
 		if (entity.getSprite() == null)
@@ -116,21 +122,21 @@ var renderer = (function() {
 	
 	
 	// Prototype
-	renderer.prototype = {
-		constructor: renderer,
+	_view.prototype = {
+		constructor: _view,
 		
 		draw: function(scene) {
 			drawSpace(scene);
 			drawScene(scene);
-			// drawUI();
+			drawUI(scene);
 		}
 	};
 	
-	return renderer;
+	return _view;
 })();
 
 
-renderer.sprite = function(image, x, y, width, height) {
+View.sprite = function(image, x, y, width, height) {
 	var pos = [x, y];
 	
 	if (x == null || y == null) {
@@ -166,7 +172,7 @@ renderer.sprite = function(image, x, y, width, height) {
 }
 
 
-renderer.spriteSheet = function(image, sprite_w, sprite_h) {
+View.spriteSheet = function(image, sprite_w, sprite_h) {
 	var img = image,
 		width = image.width,
 		height = image.height,
@@ -186,7 +192,7 @@ renderer.spriteSheet = function(image, sprite_w, sprite_h) {
 			var x = i % (width / sprite_w),
 				y = Math.floor(i / (width / sprite_w));
 			
-			sprites[i] = new renderer.sprite(image, x * sprite_w, y * sprite_h, sprite_w, sprite_h);
+			sprites[i] = new View.sprite(image, x * sprite_w, y * sprite_h, sprite_w, sprite_h);
 		}
 		
 		return sprites[i];
