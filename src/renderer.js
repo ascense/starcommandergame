@@ -26,7 +26,7 @@ var renderer = (function() {
 		var ents = scene.getEntities(),
 			cam = scene.getCamera();
 		
-		context.translate(-cam.getPosition()[0], -cam.getPosition()[1]);
+		context.translate(-cam.getPosition()[0] / (1 + cam.getRotation()), -cam.getPosition()[1] / (1 + cam.getRotation()));
 		
 		for (var i = 0; i < ents.length; i++) {
 			// TODO: ota huomioon entityn koko, canvas.w/h * 0.5
@@ -36,39 +36,49 @@ var renderer = (function() {
 				  || ents[i].getPosition()[1] - cam.getPosition()[1] > (canvas.height * 0.65)) {
 				continue;
 			}
-			drawEntity(ents[i]);
+			drawEntity(ents[i], 1 / (1 + cam.getRotation()));
 		}
 		
-		context.translate(cam.getPosition()[0], cam.getPosition()[1]);
+		context.translate(cam.getPosition()[0] / (1 + cam.getRotation()), cam.getPosition()[1] / (1 + cam.getRotation()));
+		
+		ents = scene.getUiEntities();
+		for (var i = 0; i < ents.length; i++) {
+			drawEntity(ents[i], 1);
+		}
 	}
 	
-	function drawEntity(entity) {
+	function drawEntity(entity, scale) {
 		if (entity.getSprite() == null)
 			return;
 		
 		drawRotated(
 			entity.getSprite(),
-			entity.getPosition()[0],
-			entity.getPosition()[1],
-			entity.getRotation()
+			entity.getPosition()[0] * scale,
+			entity.getPosition()[1] * scale,
+			entity.getRotation(),
+			scale
 		);
 	}
 	
-	function drawRotated(sprite, x, y, rot) {
+	function drawRotated(sprite, x, y, rot, scale) {
 		var center_x = canvas.width / 2,
 			center_y = canvas.height / 2,
-			img_w = sprite.getWidth(),
-			img_h = sprite.getHeight();
+			img_w = sprite.getWidth() * scale,
+			img_h = sprite.getHeight() * scale;
 		
-		// apply rotation
-		context.translate(center_x + x, center_y + y);
-		context.rotate(rot);
-		
-		drawSprite(sprite, -img_w / 2, -img_h / 2, img_w, img_h);
-		
-		// reset rotation
-		context.rotate(-rot);
-		context.translate(-center_x - x, -center_y - y);
+		if (rot != 0) {
+			// apply rotation
+			context.translate(center_x + x, center_y + y);
+			context.rotate(rot);
+			
+			drawSprite(sprite, -img_w / 2, -img_h / 2, img_w, img_h);
+			
+			// reset rotation
+			context.rotate(-rot);
+			context.translate(-center_x - x, -center_y - y);
+		} else {
+			drawSprite(sprite, center_x + x - img_w / 2, center_y + y - img_h / 2, img_w, img_h);
+		}
 	}
 	
 	function drawSprite(sprite, x, y, w, h) {

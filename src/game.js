@@ -12,8 +12,9 @@
 var game = (function() {
 	var state, // current game state, from game.enumState
 		stateData = {},
-		stateStack = [], // format: [state, camera, entities, stateData]
+		stateStack = [], // format: [state, camera, entities, uiEntities, stateData]
 		entities = [],
+		uiEntities = [],
 		camera = null,
 		sprite_title = null,
 		sheet_ship = null,
@@ -42,6 +43,7 @@ var game = (function() {
 	function newGame() {
 		stateStack = [];
 		entities = [];
+		uiEntities = [];
 	}
 	
 	function pushState() {
@@ -49,6 +51,7 @@ var game = (function() {
 			state,
 			camera,
 			entities,
+			uiEntities,
 			stateData
 		];
 		
@@ -64,7 +67,8 @@ var game = (function() {
 		state = cur_state[0];
 		camera = cur_state[1];
 		entities = cur_state[2];
-		stateData = cur_state[3];
+		uiEntities = cur_state[3];
+		stateData = cur_state[4];
 		
 		throw "state change";
 	}
@@ -72,6 +76,7 @@ var game = (function() {
 	function enterMenu() {
 		state = game.enumState.MENU;
 		entities = [];
+		uiEntities = [];
 		stateData = {
 			selected: 0,
 			selectTimer: 0
@@ -100,6 +105,7 @@ var game = (function() {
 	function enterPlanet() {
 		state = game.enumState.PLANET;
 		entities = [];
+		uiEntities = [];
 		stateData = {};
 		
 		camera = new game.physicsEntity(0, 0, 0, 0, 0.25, 0.1);
@@ -110,18 +116,31 @@ var game = (function() {
 	function enterGalaxy() {
 		state = game.enumState.GALAXY;
 		entities = [];
-		stateData = {selected: 1};
+		uiEntities = [];
+		stateData = {
+			selected: 4,
+			stars: [1, 2, 3]
+		};
 		
-		camera = new game.physicsEntity(0, 0, 0, 0, 0.25, 0.1);
+		camera = new game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
 	
 		entities[0] = new game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
 		entities[0].setSprite(sheet_ship.getSprite(0));
 		
 		entities[1] = new game.entity(0, 0);
-		entities[1].setSprite(new renderer.sprite($("#img_planet")[0]));
+		entities[1].setSprite(sheet_ui.getSprite(4));
 		
 		entities[2] = new game.entity(0, 0);
-		entities[2].setSprite(sheet_ui.getSprite(0));
+		entities[2].setSprite(sheet_ui.getSprite(5));
+		
+		entities[3] = new game.entity(0, 0);
+		entities[3].setSprite(sheet_ui.getSprite(6));
+		
+		entities[4] = new game.entity(0, 0);
+		entities[4].setSprite(new renderer.sprite($("#img_planet")[0]));
+		
+		uiEntities[0] = new game.entity(0, 0);
+		uiEntities[0].setSprite(sheet_ui.getSprite(0));
 		
 		throw "state change";
 	}
@@ -205,7 +224,7 @@ var game = (function() {
 		handleGalaxyInput();
 		
 		updateEntities();
-		updateCamera();
+		updateCamera(0.05);
 		
 		handleGalaxyPhysics();
 		
@@ -236,28 +255,15 @@ var game = (function() {
 		if (input.isKeyDown(65)) { // A
 			entities[0].rotate(-0.075);
 		}
-		
-		if (input.isKeyDown(38)) { // UP
-			camera.move(0, -3);
-		}
-		if (input.isKeyDown(40)) { // DOWN
-			camera.move(0, 3);
-		}
-		if (input.isKeyDown(39)) { // RT
-			camera.rotate(0.15);
-		}
-		if (input.isKeyDown(37)) { // LT
-			camera.rotate(-0.15);
-		}
 	}
 	
 	function handleGalaxyPhysics() {
 		entities[0].applyGravity([0, 0], 50, 0.2);
 		
-		var coll_sq = lib.collidePointSphere(entities[0].getPosition(), entities[1].getPosition(), 100);
+		var coll_sq = lib.collidePointSphere(entities[0].getPosition(), entities[4].getPosition(), 100);
 		if (coll_sq > 0) {
-			var x_dist = entities[0].getPosition()[0] - entities[1].getPosition()[0],
-				y_dist = entities[0].getPosition()[1] - entities[1].getPosition()[1],
+			var x_dist = entities[0].getPosition()[0] - entities[4].getPosition()[0],
+				y_dist = entities[0].getPosition()[1] - entities[4].getPosition()[1],
 				norm = lib.vecNormalize([x_dist, y_dist]),
 				pos = entities[0].getPosition(),
 				mom = entities[0].getMomentum(),
@@ -267,6 +273,26 @@ var game = (function() {
 				pos[0] + coll * norm[0],
 				pos[1] + coll * norm[1]
 			);
+		}
+		
+		for (var i = 0; i < stateData.stars.length; i++) {
+			var camPos = camera.getPosition(),
+				x_pos = 0,
+				y_pos = 0;
+				
+			if (camPos[0] + i * 600 < 0) {
+				x_pos = camPos[0] + ((-camPos[0] - i * 600) / 4) % 800 - 400;
+			} else {
+				x_pos = camPos[0] + ((-camPos[0] - i * 600) / 4) % 800 + 400;
+			}
+			
+			if (camPos[1] + i * 1450 < 0) {
+				y_pos = camPos[1] + ((-camPos[1] - i * 1450) / 4) % 600 - 300;
+			} else {
+				y_pos = camPos[1] + ((-camPos[1] - i * 1450) / 4) % 600 + 300;
+			}
+			
+			entities[stateData.stars[i]].setPosition(x_pos, y_pos);
 		}
 	}
 	
@@ -284,12 +310,12 @@ var game = (function() {
 		}
 	}
 	
-	function updateCamera() {
+	function updateCamera(stiffness) {
 		// camera tracking
 		var x_diff = entities[0].getPosition()[0] - camera.getPosition()[0],
 			y_diff = entities[0].getPosition()[1] - camera.getPosition()[1];
 		
-		camera.applyForce(x_diff * 0.02, y_diff * 0.02);
+		camera.applyForce(x_diff * stiffness, y_diff * stiffness);
 		
 		camera.tick();
 	}
@@ -316,10 +342,10 @@ var game = (function() {
 		}
 		
 		if (offscreen) {
-			entities[2].setPosition(x_diff + camera.getPosition()[0], y_diff + camera.getPosition()[1]);
-			entities[2].setSprite(sheet_ui.getSprite(2));
+			uiEntities[0].setPosition(x_diff, y_diff);
+			uiEntities[0].setSprite(sheet_ui.getSprite(2));
 		} else {
-			entities[2].setSprite(sheet_ui.getSprite(0));
+			uiEntities[0].setSprite(sheet_ui.getSprite(0));
 		}
 	}
 	
@@ -359,6 +385,10 @@ var game = (function() {
 		
 		getEntities: function() {
 			return entities;
+		},
+		
+		getUiEntities: function() {
+			return uiEntities;
 		}
 	};
 	
