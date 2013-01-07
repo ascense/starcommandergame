@@ -118,8 +118,7 @@ var game = (function() {
 		entities = [];
 		uiEntities = [];
 		stateData = {
-			selected: 4,
-			stars: [1, 2, 3]
+			selected: 1
 		};
 		
 		camera = new game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
@@ -128,16 +127,7 @@ var game = (function() {
 		entities[0].setSprite(sheet_ship.getSprite(0));
 		
 		entities[1] = new game.entity(0, 0);
-		entities[1].setSprite(sheet_ui.getSprite(4));
-		
-		entities[2] = new game.entity(0, 0);
-		entities[2].setSprite(sheet_ui.getSprite(5));
-		
-		entities[3] = new game.entity(0, 0);
-		entities[3].setSprite(sheet_ui.getSprite(6));
-		
-		entities[4] = new game.entity(0, 0);
-		entities[4].setSprite(new renderer.sprite($("#img_planet")[0]));
+		entities[1].setSprite(new renderer.sprite($("#img_planet")[0]));
 		
 		uiEntities[0] = new game.entity(0, 0);
 		uiEntities[0].setSprite(sheet_ui.getSprite(0));
@@ -260,10 +250,10 @@ var game = (function() {
 	function handleGalaxyPhysics() {
 		entities[0].applyGravity([0, 0], 50, 0.2);
 		
-		var coll_sq = lib.collidePointSphere(entities[0].getPosition(), entities[4].getPosition(), 100);
+		var coll_sq = lib.collidePointSphere(entities[0].getPosition(), entities[1].getPosition(), 100);
 		if (coll_sq > 0) {
-			var x_dist = entities[0].getPosition()[0] - entities[4].getPosition()[0],
-				y_dist = entities[0].getPosition()[1] - entities[4].getPosition()[1],
+			var x_dist = entities[0].getPosition()[0] - entities[1].getPosition()[0],
+				y_dist = entities[0].getPosition()[1] - entities[1].getPosition()[1],
 				norm = lib.vecNormalize([x_dist, y_dist]),
 				pos = entities[0].getPosition(),
 				mom = entities[0].getMomentum(),
@@ -273,26 +263,6 @@ var game = (function() {
 				pos[0] + coll * norm[0],
 				pos[1] + coll * norm[1]
 			);
-		}
-		
-		for (var i = 0; i < stateData.stars.length; i++) {
-			var camPos = camera.getPosition(),
-				x_pos = 0,
-				y_pos = 0;
-				
-			if (camPos[0] + i * 600 < 0) {
-				x_pos = camPos[0] + ((-camPos[0] - i * 600) / 4) % 800 - 400;
-			} else {
-				x_pos = camPos[0] + ((-camPos[0] - i * 600) / 4) % 800 + 400;
-			}
-			
-			if (camPos[1] + i * 1450 < 0) {
-				y_pos = camPos[1] + ((-camPos[1] - i * 1450) / 4) % 600 - 300;
-			} else {
-				y_pos = camPos[1] + ((-camPos[1] - i * 1450) / 4) % 600 + 300;
-			}
-			
-			entities[stateData.stars[i]].setPosition(x_pos, y_pos);
 		}
 	}
 	
@@ -318,11 +288,24 @@ var game = (function() {
 		camera.applyForce(x_diff * stiffness, y_diff * stiffness);
 		
 		camera.tick();
+		
+		// camera zoom
+		x_diff = entities[stateData.selected].getPosition()[0] - camera.getPosition()[0];
+		y_diff = entities[stateData.selected].getPosition()[1] - camera.getPosition()[1];
+		
+		var dist = Math.sqrt(x_diff * x_diff + y_diff * y_diff) * 0.15;
+		
+		if (dist > 200) {
+			dist = 200;
+		}
+		
+		camera.setRotation(dist * 0.01);
 	}
 	
 	function offscreenTracker(trackedId) {
-		var x_diff = entities[trackedId].getPosition()[0] - camera.getPosition()[0],
-			y_diff = entities[trackedId].getPosition()[1] - camera.getPosition()[1],
+		var scale = 1 / (1 + camera.getRotation()),
+			x_diff = (entities[trackedId].getPosition()[0] - camera.getPosition()[0]) * scale,
+			y_diff = (entities[trackedId].getPosition()[1] - camera.getPosition()[1]) * scale,
 			offscreen = false;
 		
 		if (x_diff < -390) {

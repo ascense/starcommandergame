@@ -9,37 +9,64 @@
 
 var renderer = (function() {
 	var canvas,
-		context;
+		context,
+		sheet_stars;
 
 	// Constructor
 	function renderer(canv) {
 		canvas = canv;
 		context = canv.getContext("2d");
+		
+		sheet_stars = new renderer.spriteSheet($("#img_fx")[0], 10, 10);
 	}
 	
-	function drawSpace() {
+	function drawSpace(scene) {
 		// clear screen
 		context.clearRect(0, 0, canvas.width, canvas.height);
+		
+		if (scene.getState() == game.enumState.GALAXY) {
+			// draw stars
+			for (var i = 0; i < 6; i++) {
+				var camPos = scene.getCamera().getPosition(),
+					camScale = 1 / (1 + scene.getCamera().getRotation()),
+					x_pos = -camPos[0] * (camScale / 4) - (i * i * 221),
+					y_pos = -camPos[1] * (camScale / 4) - (i * i * 349);
+				
+				if (x_pos < 0) {
+					x_pos = (x_pos % 800) + 800;
+				} else {
+					x_pos = (x_pos % 800) - 800;
+				}
+				
+				if (y_pos < 0) {
+					y_pos = (y_pos % 600) + 600;
+				} else {
+					y_pos = (y_pos % 600) - 600;
+				}
+				
+				drawSprite(sheet_stars.getSprite(4 + (i % 3)), x_pos, y_pos, 10, 10);
+			}
+		}
 	}
 	
 	function drawScene(scene) {
 		var ents = scene.getEntities(),
-			cam = scene.getCamera();
+			cam = scene.getCamera(),
+			scale = 1 / (1 + cam.getRotation());
 		
-		context.translate(-cam.getPosition()[0] / (1 + cam.getRotation()), -cam.getPosition()[1] / (1 + cam.getRotation()));
+		context.translate(-cam.getPosition()[0] * scale, -cam.getPosition()[1] * scale);
 		
 		for (var i = 0; i < ents.length; i++) {
-			// TODO: ota huomioon entityn koko, canvas.w/h * 0.5
-			if (ents[i].getPosition()[0] - cam.getPosition()[0] < (-canvas.width * 0.65)
-				  || ents[i].getPosition()[0] - cam.getPosition()[0] > (canvas.width * 0.65)
-				  || ents[i].getPosition()[1] - cam.getPosition()[1] < (-canvas.height * 0.65)
-				  || ents[i].getPosition()[1] - cam.getPosition()[1] > (canvas.height * 0.65)) {
+			if ((ents[i].getPosition()[0] - cam.getPosition()[0]) * scale < (-canvas.width - ents[i].getSprite().getWidth()) * 0.5
+				  || (ents[i].getPosition()[0] - cam.getPosition()[0]) * scale > (canvas.width + ents[i].getSprite().getWidth()) * 0.5
+				  || (ents[i].getPosition()[1] - cam.getPosition()[1]) * scale < (-canvas.height - ents[i].getSprite().getHeight()) * 0.5
+				  || (ents[i].getPosition()[1] - cam.getPosition()[1]) * scale > (canvas.height + ents[i].getSprite().getHeight()) * 0.5) {
 				continue;
 			}
-			drawEntity(ents[i], 1 / (1 + cam.getRotation()));
+			drawEntity(ents[i], scale);
 		}
 		
-		context.translate(cam.getPosition()[0] / (1 + cam.getRotation()), cam.getPosition()[1] / (1 + cam.getRotation()));
+		context.translate(cam.getPosition()[0] * scale, cam.getPosition()[1] * scale);
 		
 		ents = scene.getUiEntities();
 		for (var i = 0; i < ents.length; i++) {
@@ -93,7 +120,7 @@ var renderer = (function() {
 		constructor: renderer,
 		
 		draw: function(scene) {
-			drawSpace();
+			drawSpace(scene);
 			drawScene(scene);
 			// drawUI();
 		}
