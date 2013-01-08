@@ -22,31 +22,30 @@ var View = (function() {
 		sheet_stars = new View.spriteSheet($("#img_fx")[0], 10, 10);
 	}
 	
-	function drawSpace(scene) {
-		// clear screen
-		context.clearRect(0, 0, canvas.width, canvas.height);
+	function drawBackground(scene) {
+		if (!scene.background) {
+			drawSpace(scene);
+			return;
+		}
 		
-		if (state.get() == State.enum.COMBAT) {
-			// draw stars
-			for (var i = 0; i < 6; i++) {
-				var camPos = scene.camera.getPosition(),
-					camScale = 1 / (1 + scene.camera.getRotation()),
-					x_pos = -camPos[0] * (camScale / 4) - (i * i * 221),
-					y_pos = -camPos[1] * (camScale / 4) - (i * i * 349);
-				
-				if (x_pos < 0) {
-					x_pos = (x_pos % 800) + 800;
-				} else {
-					x_pos = (x_pos % 800) - 800;
-				}
-				
-				if (y_pos < 0) {
-					y_pos = (y_pos % 600) + 600;
-				} else {
-					y_pos = (y_pos % 600) - 600;
-				}
-				
-				drawSprite(sheet_stars.getSprite(4 + (i % 3)), x_pos, y_pos, 10, 10);
+		var cam = scene.camera.getPosition(),
+			width = scene.background.getWidth(),
+			height = scene.background.getHeight(),
+			x_offs = (width - canvas.width) / 2,
+			y_offs = (height - canvas.height) / 2,
+			x_start = (-cam[0] - x_offs) % width,
+			y_start = (-cam[1] - y_offs) % height;
+		
+		if (x_start > 0) {
+			x_start -= width;
+		}
+		if (y_start > 0) {
+			y_start -= height;
+		}
+		
+		for (var x = x_start; x < canvas.width; x += width) {
+			for (var y = y_start; y < canvas.height; y += height) {
+				drawSprite(scene.background, x, y, width, height);
 			}
 		}
 	}
@@ -75,10 +74,36 @@ var View = (function() {
 		var ents = scene.uiEntities;
 		
 		for (var i = 0; i < ents.length; i++) {
-			drawEntity(ents[i], 1);
+			drawUIEntity(ents[i]);
 		}
 	}
 	
+	function drawSpace(scene) {
+		// clear screen
+		context.clearRect(0, 0, canvas.width, canvas.height);
+		
+		// draw stars
+		for (var i = 0; i < 6; i++) {
+			var camPos = scene.camera.getPosition(),
+				camScale = 1 / (1 + scene.camera.getRotation()),
+				x_pos = -camPos[0] * (camScale / 4) - (i * i * 221),
+				y_pos = -camPos[1] * (camScale / 4) - (i * i * 349);
+			
+			if (x_pos < 0) {
+				x_pos = (x_pos % 800) + 800;
+			} else {
+				x_pos = (x_pos % 800) - 800;
+			}
+			
+			if (y_pos < 0) {
+				y_pos = (y_pos % 600) + 600;
+			} else {
+				y_pos = (y_pos % 600) - 600;
+			}
+			
+			drawSprite(sheet_stars.getSprite(4 + (i % 3)), x_pos, y_pos, 10, 10);
+		}
+	}
 	
 	function drawEntity(entity, scale) {
 		if (entity.getSprite() == null)
@@ -90,6 +115,19 @@ var View = (function() {
 			entity.getPosition()[1] * scale,
 			entity.getRotation(),
 			scale
+		);
+	}
+	
+	function drawUIEntity(entity) {
+		if (entity.getSprite() == null)
+			return;
+		
+		drawSprite(
+			entity.getSprite(),
+			entity.getPosition()[0],
+			entity.getPosition()[1],
+			entity.getSprite().getWidth(),
+			entity.getSprite().getHeight()
 		);
 	}
 	
@@ -126,9 +164,22 @@ var View = (function() {
 		constructor: _view,
 		
 		draw: function(scene) {
-			drawSpace(scene);
+			drawBackground(scene);
 			drawScene(scene);
 			drawUI(scene);
+		},
+		
+		getMinimap: function(sprite) {		
+			context.drawImage(
+				sprite.getImage(),
+				0, 0, sprite.getWidth(), sprite.getHeight(),
+				0, 0, 240, 90
+			);
+			
+			var minimap = new Image();
+			minimap.src = canvas.toDataURL("image/png");
+			
+			return new View.sprite(minimap, 0, 0, 240, 90);
 		}
 	};
 	
@@ -189,10 +240,10 @@ View.spriteSheet = function(image, sprite_w, sprite_h) {
 			return null;
 		
 		if (!sprites[i]) {
-			var x = i % (width / sprite_w),
-				y = Math.floor(i / (width / sprite_w));
+			var x = (i * sprite_w) % width,
+				y = Math.floor((i * sprite_w) / width) * sprite_h;
 			
-			sprites[i] = new View.sprite(image, x * sprite_w, y * sprite_h, sprite_w, sprite_h);
+			sprites[i] = new View.sprite(image, x, y, sprite_w, sprite_h);
 		}
 		
 		return sprites[i];
