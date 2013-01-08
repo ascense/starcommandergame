@@ -14,7 +14,7 @@ Game = (function() {
 	var scene = null,
 		sprite_title = null,
 		sheet_ship = null,
-		sheet_ui = null,
+		sheet_fx = null,
 		sheet_menu = null;
 
 	// Constructor
@@ -22,7 +22,7 @@ Game = (function() {
 		sprite_title = new View.sprite($("#img_title")[0]);
 		
 		sheet_menu = new View.spriteSheet($("#img_menu")[0], 300, 50);
-		sheet_ui = new View.spriteSheet($("#img_fx")[0], 10, 10);
+		sheet_fx = new View.spriteSheet($("#img_fx")[0], 10, 10);
 		sheet_ship = new View.spriteSheet($("#img_ship")[0], 50, 100);
 		
 		// state callbacks
@@ -32,6 +32,7 @@ Game = (function() {
 		state.addCallback(State.enum.GALAXY, enterGalaxy);
 	}
 	
+	/** MENU **/
 	function enterMenu() {
 		scene.data.selected = 0;
 		scene.data.selectTimer = 0;
@@ -44,7 +45,7 @@ Game = (function() {
 		
 		// menu arrow
 		scene.entities[1] = new Game.entity(-150, 55);
-		scene.entities[1].setSprite(sheet_ui.getSprite(1));
+		scene.entities[1].setSprite(sheet_fx.getSprite(1));
 		scene.entities[1].rotate(Math.PI / 2);
 		
 		// menu entries
@@ -54,33 +55,6 @@ Game = (function() {
 		}
 	}
 	
-	function enterPlanet() {
-		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.1);
-	}
-	
-	function enterCombat() {
-		scene.data.selected = 1;
-		
-		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
-	
-		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
-		scene.entities[0].setSprite(sheet_ship.getSprite(0));
-		
-		scene.entities[1] = new Game.entity(0, 0);
-		scene.entities[1].setSprite(new View.sprite($("#img_planet")[0]));
-		
-		scene.uiEntities[0] = new Game.entity(0, 0);
-		scene.uiEntities[0].setSprite(sheet_ui.getSprite(0));
-	}
-	
-	function enterGalaxy() {
-		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
-		
-		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
-		scene.entities[0].setSprite(sheet_ship.getSprite(0));
-	}
-	
-	/** MENU **/
 	function updateMenu() {
 		handleMenuInput();
 		
@@ -146,6 +120,10 @@ Game = (function() {
 	}
 	
 	/** PLANET **/
+	function enterPlanet() {
+		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.1);
+	}
+	
 	function updatePlanet() {
 		// handleInput
 		
@@ -158,6 +136,22 @@ Game = (function() {
 	}
 	
 	/** COMBAT **/
+	function enterCombat() {
+		scene.data.selected = 1;
+		scene.data.shootTimer = 0;
+		
+		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
+	
+		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
+		scene.entities[0].setSprite(sheet_ship.getSprite(0));
+		
+		scene.entities[1] = new Game.entity(0, 0);
+		scene.entities[1].setSprite(new View.sprite($("#img_planet")[0]));
+		
+		scene.uiEntities[0] = new Game.entity(0, 0);
+		scene.uiEntities[0].setSprite(sheet_fx.getSprite(0));
+	}
+	
 	function updateCombat() {
 		handleCombatInput();
 		
@@ -193,6 +187,27 @@ Game = (function() {
 		if (input.isKeyDown(65)) { // A
 			scene.entities[0].rotate(-0.075);
 		}
+		
+		if (scene.data.shootTimer > 0) {
+			scene.data.shootTimer--;
+		}
+		
+		if (input.isKeyDown(32) && scene.data.shootTimer == 0) { // Space
+			var bullet = new Game.physicsEntity(
+				scene.entities[0].getPosition()[0],
+				scene.entities[0].getPosition()[1],
+				Math.sin(scene.entities[0].getRotation()) * 7.5 + scene.entities[0].getMomentum()[0],
+				Math.cos(scene.entities[0].getRotation()) * -7.5 + scene.entities[0].getMomentum()[1],
+				0,
+				0
+			);
+			
+			bullet.setSprite(sheet_fx.getSprite(3));
+			bullet.setTimeToLive(90);
+			
+			scene.data.shootTimer = 15;
+			scene.entities.push(bullet);
+		}
 	}
 	
 	function handleCombatPhysics() {
@@ -215,6 +230,13 @@ Game = (function() {
 	}
 	
 	/** GALAXY **/
+	function enterGalaxy() {
+		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
+		
+		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
+		scene.entities[0].setSprite(sheet_ship.getSprite(0));
+	}
+	
 	function updateGalaxy() {
 		// handleInput
 		
@@ -224,6 +246,7 @@ Game = (function() {
 		// handlePhysics
 	}
 	
+	/** Helper Functions **/
 	function updateCamera(stiffness) {
 		// camera tracking
 		var x_diff = scene.entities[0].getPosition()[0] - scene.camera.getPosition()[0],
@@ -270,9 +293,9 @@ Game = (function() {
 		
 		if (offscreen) {
 			scene.uiEntities[0].setPosition(x_diff, y_diff);
-			scene.uiEntities[0].setSprite(sheet_ui.getSprite(2));
+			scene.uiEntities[0].setSprite(sheet_fx.getSprite(2));
 		} else {
-			scene.uiEntities[0].setSprite(sheet_ui.getSprite(0));
+			scene.uiEntities[0].setSprite(sheet_fx.getSprite(0));
 		}
 	}
 	
@@ -346,7 +369,7 @@ Game.scene = function() {
 	this.update = function() {
 		for (var i = 0; i < this.entities.length; i++) {
 			while (!this.entities[i].alive) {
-				if (i == this.entities.length) {
+				if (i == this.entities.length - 1) {
 					this.entities.pop();
 					return;
 				}
@@ -475,7 +498,8 @@ Game.entity = function(x, y) {
 
 Game.physicsEntity = function(x, y, x_mom, y_mom, dissipation, decay) {
 	var pos = [x, y],
-		ent = new Game.entity(x_mom, y_mom);
+		ent = new Game.entity(x_mom, y_mom),
+		ttl = -1; // time-to-live timer
 	
 	function applyDecay() {
 		/**
@@ -543,6 +567,10 @@ Game.physicsEntity = function(x, y, x_mom, y_mom, dissipation, decay) {
 		ent.getPosition()[1] += y_force;
 	}
 	
+	this.setTimeToLive = function(_ttl) {
+		ttl = _ttl; // how many game ticks (60th's of a sec) to live
+	}
+	
 	this.getMomentum = function() {
 		return ent.getPosition();
 	}
@@ -564,6 +592,12 @@ Game.physicsEntity = function(x, y, x_mom, y_mom, dissipation, decay) {
 	this.tick = function() {
 		applyMomentum();
 		applyDecay();
+		
+		if (ttl > 0) {
+			ttl--;
+		} else if (ttl == 0) {
+			this.alive = false;
+		}
 	}
 	
 	this.alive = ent.alive;
