@@ -297,6 +297,31 @@ Game = (function() {
 	}
 	
 	function handlePlanetPhysics() {
+		// obstacle updates
+		for (var i = 1; i < scene.data.oreStart; i++) {
+			if (scene.entities[i].getType() != Game.entityType.DANGER)
+				continue;
+			
+			// collide
+			if (lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[i].getPosition(), 45) > 0) {
+				if (scene.data.transitionFrame == -1) {
+					health--;
+					scene.data.transitionFrame = -6;
+					scene.uiEntities[health + 3].setSprite(sheet_fx.getSprite(10));
+				}
+			}
+			
+			// move
+			var time = new Date().getTime();
+			
+			scene.entities[i].setPosition(
+				(time / 5 + scene.entities[i].origin[0]) % 2400 - 1200,
+				(time / 15 + Math.sin(time / 250 + scene.entities[i].offset) * 50 + scene.entities[i].origin[1]) % 900 - 450
+			);
+			scene.entities[i].setSprite(sheet_anim.getSprite(Math.floor(time / 100) % 4));
+		}
+		
+		// transition
 		if (scene.data.transitionFrame > 0) {
 			scene.camera.setRotation(1 + 2 / 30 * (30 - scene.data.transitionFrame));
 			return;
@@ -351,30 +376,6 @@ Game = (function() {
 			550 + scene.entities[scene.data.player].getPosition()[1] / 10
 		);
 		
-		// obstacle updates
-		for (var i = 1; i < scene.data.oreStart; i++) {
-			if (scene.entities[i].getType() != Game.entityType.DANGER)
-				continue;
-			
-			// collide
-			if (lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[i].getPosition(), 45) > 0) {
-				if (scene.data.transitionFrame == -1) {
-					health--;
-					scene.data.transitionFrame = -6;
-					scene.uiEntities[health + 3].setSprite(sheet_fx.getSprite(10));
-				}
-			}
-			
-			// move
-			var time = new Date().getTime();
-			
-			scene.entities[i].setPosition(
-				(time / 5 + scene.entities[i].origin[0]) % 2400 - 1200,
-				(time / 15 + Math.sin(time / 250 + scene.entities[i].offset) * 50 + scene.entities[i].origin[1]) % 900 - 450
-			);
-			scene.entities[i].setSprite(sheet_anim.getSprite(Math.floor(time / 100) % 4));
-		}
-		
 		// ore collision
 		for (var i = scene.data.oreStart; i < scene.entities.length; i++) {
 			if (scene.entities[i].getType() != Game.entityType.ITEM)
@@ -411,10 +412,10 @@ Game = (function() {
 		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
 		scene.camera.setRotation(1);
 	
-		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
+		scene.entities[0] = new Game.physicsEntity(200, 200, 0, 0, 0.15, 0.001);
 		scene.entities[0].setSprite(sheet_ship.getSprite(0));
 		
-		scene.entities[1] = new Game.physicsEntity(-100, -100, 0, 0, 0.15, 0.001);
+		scene.entities[1] = new Game.physicsEntity(200, -200, 0, 0, 0.15, 0.001);
 		scene.entities[1].setSprite(sheet_ship.getSprite(2));
 		scene.entities[1].health = 10;
 		
@@ -493,20 +494,23 @@ Game = (function() {
 	
 	function handleCombatPhysics() {
 		scene.entities[scene.data.player].applyGravity([0, 0], 50, 0.2);
-			
-		var coll_sq = lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[2].getPosition(), 100);
-		if (coll_sq > 0) {
-			var x_dist = scene.entities[scene.data.player].getPosition()[0] - scene.entities[2].getPosition()[0],
-				y_dist = scene.entities[scene.data.player].getPosition()[1] - scene.entities[2].getPosition()[1],
-				norm = lib.vecNormalize([x_dist, y_dist]),
-				pos = scene.entities[scene.data.player].getPosition(),
-				mom = scene.entities[scene.data.player].getMomentum(),
-				coll = Math.sqrt(coll_sq) / 2;
-			
-			scene.entities[scene.data.player].setPosition(
-				pos[0] + coll * norm[0],
-				pos[1] + coll * norm[1]
-			);
+		
+		var coll_sq;
+		for (var i = 0; i < 2; i++) {
+			coll_sq = lib.collidePointSphere(scene.entities[i].getPosition(), scene.entities[2].getPosition(), 100);
+			if (coll_sq > 0) {
+				var x_dist = scene.entities[i].getPosition()[0] - scene.entities[2].getPosition()[0],
+					y_dist = scene.entities[i].getPosition()[1] - scene.entities[2].getPosition()[1],
+					norm = lib.vecNormalize([x_dist, y_dist]),
+					pos = scene.entities[i].getPosition(),
+					mom = scene.entities[i].getMomentum(),
+					coll = Math.sqrt(coll_sq) / 2;
+				
+				scene.entities[i].setPosition(
+					pos[0] + coll * norm[0],
+					pos[1] + coll * norm[1]
+				);
+			}
 		}
 		
 		// enemy position
@@ -521,13 +525,15 @@ Game = (function() {
 			lib.vecNormalize(offset)
 		);
 
+		scene.entities[1].setSprite(sheet_ship.getSprite(2));
 		if (dot > 0.2) {
 			scene.entities[1].rotate(0.075);
 		} else if (dot < -0.2) {
 			scene.entities[1].rotate(-0.075);
 		} else {
-			if (offset[0] * offset[0] + offset[1] * offset[1] > 10000) {
+			if (offset[0] * offset[0] + offset[1] * offset[1] > 15000) {
 				scene.entities[1].translate(0.2);
+				scene.entities[1].setSprite(sheet_ship.getSprite(3));
 			} else {
 				// (mostly) negative translation, to keep some distance
 				scene.entities[1].translate(0.05 - Math.abs(dot));
@@ -917,6 +923,10 @@ Game = (function() {
 		
 		getScene: function() {
 			return scene;
+		},
+		
+		getScore: function() {
+			return score;
 		}
 	};
 	

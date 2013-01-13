@@ -92,6 +92,16 @@ var View = (function() {
 			} else {
 				context.fillText("...", 525, 325);
 			}
+		} else if (state.get() == State.enum.MENU) {
+			context.font = "8pt Lucida Console";
+			context.fillStyle = "#600417";
+			
+			context.fillText(SC_VERSION, 5, 595);
+		} else {
+			context.font = "10pt Arial";
+			context.fillStyle = "#600417";
+			
+			context.fillText(game.getScore(), 790 - (game.getScore() / 10) * 5, 15);
 		}
 	}
 	

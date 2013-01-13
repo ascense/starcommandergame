@@ -1,5 +1,7 @@
 // -- Globals --
 
+var SC_VERSION = "1.0";
+
 var view,
 	state,
 	game,
