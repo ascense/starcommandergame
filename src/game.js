@@ -17,9 +17,15 @@ Game = (function() {
 		sprite_surface = [],
 		sheet_ship = null,
 		sheet_lander = null,
+		sheet_galship = null,
+		sheet_galplanets = null,
 		sheet_fx = null,
+		sheet_anim = null,
 		sheet_menu = null,
-		sheet_ore = null;
+		sheet_ore = null,
+		map = null,
+		health = 10,
+		score = 0;
 
 	// Constructor
 	function _game() {
@@ -29,17 +35,23 @@ Game = (function() {
 		sheet_menu = new View.spriteSheet($("#img_menu")[0], 300, 50);
 		sheet_ship = new View.spriteSheet($("#img_ship")[0], 50, 100);
 		sheet_lander = new View.spriteSheet($("#img_lander")[0], 40, 65);
+		sheet_galship = new View.spriteSheet($("#img_galaxyship")[0], 25, 50);
+		sheet_galplanets = new View.spriteSheet($("#img_galaxyplanets")[0], 75, 75);
 		
 		sheet_fx = new View.spriteSheet($("#img_fx")[0], 10, 10);
 		sheet_ore = new View.spriteSheet($("#img_ore")[0], 10, 10);
+		sheet_anim = new View.spriteSheet($("#img_anim")[0], 25, 25);
 		
-		sprite_surface[0] = new View.sprite($("#img_surface_0")[0]);
+		for (var i = 0; i < 3; i++) {
+			sprite_surface[i] = new View.sprite($("#img_surface_" + i)[0]);
+		}
 		
 		// state callbacks
 		state.addCallback(State.enum.MENU, enterMenu);
 		state.addCallback(State.enum.PLANET, enterPlanet);
 		state.addCallback(State.enum.COMBAT, enterCombat);
 		state.addCallback(State.enum.GALAXY, enterGalaxy);
+		state.addCallback(State.enum.SCORES, enterScores);
 	}
 	
 	/** MENU **/
@@ -48,6 +60,7 @@ Game = (function() {
 		scene.data.selectTimer = 0;
 		
 		scene.camera = new Game.entity(0, 0);
+		scene.camera.setRotation(1);
 		
 		// menu background
 		scene.background = sprite_title;
@@ -57,7 +70,7 @@ Game = (function() {
 		scene.uiEntities[0].setSprite(sheet_fx.getSprite(1));
 		
 		// menu entries
-		for (var i = 0; i < sheet_menu.length(); i++) {
+		for (var i = 0; i < 3; i++) {
 			scene.entities[i] = new Game.physicsEntity(-150 + i * 25, 55 + i * 55, 5, 0, 0.25, 0.01);
 			scene.entities[i].setSprite(sheet_menu.getSprite(i));
 		}
@@ -72,20 +85,19 @@ Game = (function() {
 	}
 	
 	function handleMenuInput() {
-		if (input.isKeyDown(13) || input.isKeyDown(32)) { // Enter || Space
+		if (input.isKeyDown(Input.enum.SELECT) || input.isKeyDown(Input.enum.ACTION)) {
 			switch (scene.data.selected) {
 			case 0: // New Game
-				state.clearStack();
-				state.set(State.enum.PLANET);
+				game.newGame();
+				state.set(State.enum.GALAXY);
 				break;
 			
 			case 1: // Continue
 				state.pop();
 				break;
 			
-			case 2: // Scores ## Combat for testing purposes ##
-				state.clearStack();
-				state.set(State.enum.COMBAT);
+			case 2: // Scores
+				state.set(State.enum.SCORES);
 				break;
 			}
 		}
@@ -95,14 +107,14 @@ Game = (function() {
 		}
 		
 		if (scene.data.selectTimer < 20) {
-			if (input.isKeyDown(38) || input.isKeyDown(40)) {
-				if (input.isKeyDown(40)) { // DOWN
+			if (input.isKeyDown(Input.enum.DOWN) || input.isKeyDown(Input.enum.UP)) {
+				if (input.isKeyDown(Input.enum.DOWN)) {
 					scene.data.selected++;
 					if (scene.data.selected >= scene.entities.length) {
 						scene.data.selected = 0;
 					}
 				}
-				if (input.isKeyDown(38)) { // UP
+				if (input.isKeyDown(Input.enum.UP)) {
 					scene.data.selected--;
 					if (scene.data.selected < 0) {
 						scene.data.selected = scene.entities.length - 1;
@@ -133,13 +145,16 @@ Game = (function() {
 	}
 	
 	/** PLANET **/
-	function enterPlanet() {
+	function enterPlanet(planet) {
 		// entity id for player
 		scene.data.player = 0;
 		
 		scene.data.tracker = 2;
 		scene.data.burnTimer = 15;
 		
+		scene.data.transitionFrame = -60;
+		
+		scene.data.planetId = planet;
 		scene.data.inventory = { // ore: amount
 			0: 0,
 			1: 0,
@@ -147,11 +162,12 @@ Game = (function() {
 		};
 		
 		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
+		scene.camera.setRotation(1);
 		
 		// background
-		scene.background = sprite_surface[0];
+		scene.background = sprite_surface[map.planets[planet][2]];
 		
-		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.25, 0.075);
+		scene.entities[0] = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.075);
 		scene.entities[0].setSprite(sheet_lander.getSprite(0));
 		
 		// minimap
@@ -159,57 +175,90 @@ Game = (function() {
 		scene.uiEntities[0].setSprite(sprite_map);
 		
 		scene.uiEntities[1] = new Game.entity(570, 510, Game.entityType.STATIC);
-		scene.uiEntities[1].setSprite(view.getMinimap(sprite_surface[0]));
+		scene.uiEntities[1].setSprite(view.getMinimap(scene.background));
 		
 		scene.uiEntities[2] = new Game.entity(281, 257, Game.entityType.STATIC);
 		scene.uiEntities[2].setSprite(sheet_fx.getSprite(3));
 		
+		// obstacles
+		for (var i = 0; i < map.planets[scene.data.planetId][4]; i++) {
+			scene.entities[i + 1] = new Game.entity(0, 0, Game.entityType.DANGER);
+			scene.entities[i + 1].setSprite(sheet_fx.getSprite(0));
+			scene.entities[i + 1].origin = [Math.random() * 2400, Math.random() * 900];
+			scene.entities[i + 1].offset = 2.5 * i;
+		}
+		
+		// health
+		for (var i = 1; i <= 10; i++) {
+			scene.uiEntities[i + 2] = new Game.entity(i * 8, 585, Game.entityType.STATIC);
+			if (health < i) {
+				scene.uiEntities[i + 2].setSprite(sheet_fx.getSprite(10));
+			} else {
+				scene.uiEntities[i + 2].setSprite(sheet_fx.getSprite(9));
+			}
+		}
+		
 		// ores
-		for (var i = 0; i < 12; i++) {
-			scene.entities[i + 1] = new Game.entity(Math.random() * 2380 - 1190, Math.random() * 880 - 440, Game.entityType.ITEM, "Ore " + (i % 6));
-			scene.entities[i + 1].setSprite(sheet_ore.getSprite(i % 6));
-			
-			scene.uiEntities[i + 3] = new Game.entity(
-				685 + scene.entities[i + 1].getPosition()[0] / 10,
-				550 + scene.entities[i + 1].getPosition()[1] / 10
+		scene.data.oreStart = scene.entities.length;
+		for (var i = 0; i < map.planets[scene.data.planetId][3]; i++) {
+			scene.entities[scene.data.oreStart + i] = new Game.entity(
+				Math.random() * 2380 - 1190,
+				Math.random() * 880 - 440,
+				Game.entityType.ITEM,
+				"Ore " + (i % 6)
 			);
-			scene.uiEntities[i + 3].setSprite(sheet_ore.getSprite(i % 3 + 6));
+			scene.entities[scene.data.oreStart + i].setSprite(sheet_ore.getSprite(i % 6));
 			
-			scene.entities[i + 1].uiLink = scene.uiEntities[i + 3];
+			scene.uiEntities[i + 13] = new Game.entity(
+				685 + scene.entities[scene.data.oreStart + i].getPosition()[0] / 10,
+				550 + scene.entities[scene.data.oreStart + i].getPosition()[1] / 10
+			);
+			scene.uiEntities[i + 13].setSprite(sheet_ore.getSprite(i % 3 + 6));
+			
+			scene.entities[scene.data.oreStart + i].uiLink = scene.uiEntities[i + 13];
 		}
 	}
 	
 	function updatePlanet() {
-		handlePlanetInput();
-		
-		scene.update();
-		updateCameraPosition(0.025);
+		if (scene.data.transitionFrame < 0) {
+			if (scene.data.transitionFrame < -1) {
+				scene.data.transitionFrame++;
+			}
+			
+			handlePlanetInput();
+			scene.update();
+			updateCameraPosition(0.025);
+		} else if (scene.data.transitionFrame == 0) {
+			state.pop();
+		} else {
+			scene.data.transitionFrame--;
+		}
 		
 		handlePlanetPhysics();
 	}
 	
 	function handlePlanetInput() {
-		if (input.isKeyDown(27)) { // Esc
+		if (input.isKeyDown(Input.enum.EXIT)) {
 			state.push();
 			state.set(State.enum.MENU);
 		}
 	
-		if (input.isKeyDown(87) || input.isKeyDown(38)) { // W || Up
+		if (input.isKeyDown(Input.enum.FORWARD) || input.isKeyDown(Input.enum.UP)) {
 			scene.entities[scene.data.player].translate(0.2);
 			scene.entities[scene.data.player].setSprite(sheet_lander.getSprite(1));
 		} else {
 			scene.entities[scene.data.player].setSprite(sheet_lander.getSprite(0));
 		}
 		
-		if (input.isKeyDown(83) || input.isKeyDown(40)) { // S || Down
+		if (input.isKeyDown(Input.enum.BACKWARD) || input.isKeyDown(Input.enum.DOWN)) {
 			scene.entities[scene.data.player].translate(-0.15);
 		}
 		
-		if (input.isKeyDown(65) || input.isKeyDown(37)) { // A || Left
+		if (input.isKeyDown(Input.enum.TURN_LT) || input.isKeyDown(Input.enum.LEFT)) {
 			scene.entities[scene.data.player].rotate(-0.05);
 		}
 		
-		if (input.isKeyDown(68) || input.isKeyDown(39)) { // D || Right
+		if (input.isKeyDown(Input.enum.TURN_RT) || input.isKeyDown(Input.enum.RIGHT)) {
 			scene.entities[scene.data.player].rotate(0.05);
 		}
 		
@@ -217,7 +266,7 @@ Game = (function() {
 			scene.data.burnTimer--;
 		}
 		
-		if (input.isKeyDown(32)) { // Space
+		if (input.isKeyDown(Input.enum.BOOST)) {
 			if (scene.data.burnTimer == 0) {
 				scene.data.burnTimer = 300;
 			} else if (scene.data.burnTimer > 255) {
@@ -241,13 +290,27 @@ Game = (function() {
 				scene.entities.push(smoke);
 			}
 		}
+		
+		if (input.isKeyDown(Input.enum.ACTION) || input.isKeyDown(Input.enum.SELECT)) {
+			scene.data.transitionFrame = 30;
+		}
 	}
 	
 	function handlePlanetPhysics() {
+		if (scene.data.transitionFrame > 0) {
+			scene.camera.setRotation(1 + 2 / 30 * (30 - scene.data.transitionFrame));
+			return;
+		}
+	
 		if (scene.camera.getPosition()[1] < -150) {
 			scene.camera.setPosition(scene.camera.getPosition()[0], -150);
 		} else if (scene.camera.getPosition()[1] > 150) {
 			scene.camera.setPosition(scene.camera.getPosition()[0], 150);
+		}
+		if (scene.camera.getPosition()[0] < -800) {
+			scene.camera.setPosition(-800, scene.camera.getPosition()[1]);
+		} else if (scene.camera.getPosition()[0] > 800) {
+			scene.camera.setPosition(800, scene.camera.getPosition()[1]);
 		}
 		
 		if (scene.entities[scene.data.player].getPosition()[1] < -425) {
@@ -288,14 +351,40 @@ Game = (function() {
 			550 + scene.entities[scene.data.player].getPosition()[1] / 10
 		);
 		
+		// obstacle updates
+		for (var i = 1; i < scene.data.oreStart; i++) {
+			if (scene.entities[i].getType() != Game.entityType.DANGER)
+				continue;
+			
+			// collide
+			if (lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[i].getPosition(), 45) > 0) {
+				if (scene.data.transitionFrame == -1) {
+					health--;
+					scene.data.transitionFrame = -6;
+					scene.uiEntities[health + 3].setSprite(sheet_fx.getSprite(10));
+				}
+			}
+			
+			// move
+			var time = new Date().getTime();
+			
+			scene.entities[i].setPosition(
+				(time / 5 + scene.entities[i].origin[0]) % 2400 - 1200,
+				(time / 15 + Math.sin(time / 250 + scene.entities[i].offset) * 50 + scene.entities[i].origin[1]) % 900 - 450
+			);
+			scene.entities[i].setSprite(sheet_anim.getSprite(Math.floor(time / 100) % 4));
+		}
+		
 		// ore collision
-		for (var i = 1; i < scene.entities.length; i++) {
+		for (var i = scene.data.oreStart; i < scene.entities.length; i++) {
 			if (scene.entities[i].getType() != Game.entityType.ITEM)
 				continue;
 			
 			var coll_sq = lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[i].getPosition(), 45);
 			
 			if (coll_sq > 0) {
+				map.planets[scene.data.planetId][3]--;
+				
 				scene.entities[i].alive = false;
 				if (scene.entities[i].uiLink) {
 					scene.entities[i].uiLink.alive = false;
@@ -305,28 +394,45 @@ Game = (function() {
 					scene.data.inventory[scene.entities[i].getID()] = 0;
 				}
 				scene.data.inventory[scene.entities[i].getID()]++;
+				score += 1;
 			}
 		}
 	}
 	
 	/** COMBAT **/
-	function enterCombat() {
+	function enterCombat(planet) {
 		// entity id for player
 		scene.data.player = 0;
 		
 		scene.data.selected = 1;
 		scene.data.shootTimer = 0;
+		scene.data.enemyShootTimer = 0;
 		
 		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
+		scene.camera.setRotation(1);
 	
 		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
 		scene.entities[0].setSprite(sheet_ship.getSprite(0));
 		
-		scene.entities[1] = new Game.entity(0, 0, Game.entityType.STATIC);
-		scene.entities[1].setSprite(new View.sprite($("#img_planet")[0]));
+		scene.entities[1] = new Game.physicsEntity(-100, -100, 0, 0, 0.15, 0.001);
+		scene.entities[1].setSprite(sheet_ship.getSprite(2));
+		scene.entities[1].health = 10;
+		
+		scene.entities[2] = new Game.entity(0, 0, Game.entityType.PLANET);
+		scene.entities[2].setSprite(new View.sprite($("#img_planet")[0]));
 		
 		scene.uiEntities[0] = new Game.entity(0, 0, Game.entityType.STATIC);
 		scene.uiEntities[0].setSprite(sheet_fx.getSprite(0));
+		
+		// health
+		for (var i = 1; i <= 10; i++) {
+			scene.uiEntities[i] = new Game.entity(i * 8, 585, Game.entityType.STATIC);
+			if (health < i) {
+				scene.uiEntities[i].setSprite(sheet_fx.getSprite(10));
+			} else {
+				scene.uiEntities[i].setSprite(sheet_fx.getSprite(9));
+			}
+		}
 	}
 	
 	function updateCombat() {
@@ -338,63 +444,60 @@ Game = (function() {
 		
 		handleCombatPhysics();
 		
-		offscreenTracker(scene.data.selected);		
+		offscreenTracker(scene.data.selected);
+		
+		// win condition
+		if (scene.entities[1].health <= 0) {
+			score += 10;
+			state.pop();
+		}
 	}
 	
 	function handleCombatInput() {
-		if (input.isKeyDown(27)) { // Esc
+		if (input.isKeyDown(Input.enum.EXIT)) { // Esc
 			state.push();
 			state.set(State.enum.MENU);
 		}
 	
-		if (input.isKeyDown(87) || input.isKeyDown(38)) { // W || Up
+		if (input.isKeyDown(Input.enum.FORWARD) || input.isKeyDown(Input.enum.UP)) { // W || Up
 			scene.entities[scene.data.player].translate(0.2);
 			scene.entities[scene.data.player].setSprite(sheet_ship.getSprite(1));
 		} else {
 			scene.entities[scene.data.player].setSprite(sheet_ship.getSprite(0));
 		}
 		
-		if (input.isKeyDown(83) || input.isKeyDown(40)) { // S || Down
+		if (input.isKeyDown(Input.enum.BACKWARD) || input.isKeyDown(Input.enum.DOWN)) { // S || Down
 			scene.entities[scene.data.player].translate(-0.05);
 		}
 		
-		if (input.isKeyDown(65) || input.isKeyDown(37)) { // A || Left
+		if (input.isKeyDown(Input.enum.TURN_LT) || input.isKeyDown(Input.enum.LEFT)) { // A || Left
 			scene.entities[scene.data.player].rotate(-0.075);
 		}
 		
-		if (input.isKeyDown(68) || input.isKeyDown(39)) { // D || Right
+		if (input.isKeyDown(Input.enum.TURN_RT) || input.isKeyDown(Input.enum.RIGHT)) { // D || Right
 			scene.entities[scene.data.player].rotate(0.075);
 		}
 		
 		if (scene.data.shootTimer > 0) {
 			scene.data.shootTimer--;
 		}
+		if (scene.data.enemyShootTimer > 0) {
+			scene.data.enemyShootTimer--;
+		}
 		
-		if (input.isKeyDown(32) && scene.data.shootTimer == 0) { // Space
-			var bullet = new Game.physicsEntity(
-				scene.entities[scene.data.player].getPosition()[0],
-				scene.entities[scene.data.player].getPosition()[1],
-				Math.sin(scene.entities[scene.data.player].getRotation()) * 7.5 + scene.entities[scene.data.player].getMomentum()[0],
-				Math.cos(scene.entities[scene.data.player].getRotation()) * -7.5 + scene.entities[scene.data.player].getMomentum()[1],
-				0,
-				0
-			);
-			
-			bullet.setSprite(sheet_fx.getSprite(8));
-			bullet.setTimeToLive(90);
-			
+		if (input.isKeyDown(Input.enum.ACTION) && scene.data.shootTimer == 0) { // Space
+			combatShoot(scene.data.player);
 			scene.data.shootTimer = 15;
-			scene.entities.push(bullet);
 		}
 	}
 	
 	function handleCombatPhysics() {
 		scene.entities[scene.data.player].applyGravity([0, 0], 50, 0.2);
-		
-		var coll_sq = lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[1].getPosition(), 100);
+			
+		var coll_sq = lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[2].getPosition(), 100);
 		if (coll_sq > 0) {
-			var x_dist = scene.entities[scene.data.player].getPosition()[0] - scene.entities[1].getPosition()[0],
-				y_dist = scene.entities[scene.data.player].getPosition()[1] - scene.entities[1].getPosition()[1],
+			var x_dist = scene.entities[scene.data.player].getPosition()[0] - scene.entities[2].getPosition()[0],
+				y_dist = scene.entities[scene.data.player].getPosition()[1] - scene.entities[2].getPosition()[1],
 				norm = lib.vecNormalize([x_dist, y_dist]),
 				pos = scene.entities[scene.data.player].getPosition(),
 				mom = scene.entities[scene.data.player].getMomentum(),
@@ -405,25 +508,289 @@ Game = (function() {
 				pos[1] + coll * norm[1]
 			);
 		}
+		
+		// enemy position
+		var offset = [
+			scene.entities[1].getPosition()[0] - scene.entities[scene.data.player].getPosition()[0],
+			scene.entities[1].getPosition()[1] - scene.entities[scene.data.player].getPosition()[1]
+		];
+		
+		var dot = lib.vecDotProduct(
+			[Math.sin(scene.entities[1].getRotation() + Math.PI * 1.5),
+			-Math.cos(scene.entities[1].getRotation() + Math.PI * 1.5)],
+			lib.vecNormalize(offset)
+		);
+
+		if (dot > 0.2) {
+			scene.entities[1].rotate(0.075);
+		} else if (dot < -0.2) {
+			scene.entities[1].rotate(-0.075);
+		} else {
+			if (offset[0] * offset[0] + offset[1] * offset[1] > 10000) {
+				scene.entities[1].translate(0.2);
+			} else {
+				// (mostly) negative translation, to keep some distance
+				scene.entities[1].translate(0.05 - Math.abs(dot));
+			}
+			
+			if (Math.abs(dot) <= 0.15 && scene.data.enemyShootTimer == 0) {
+				combatShoot(1);
+				scene.data.enemyShootTimer = 15;
+			}
+		}
+		
+		// bullet collision
+		for (var i = 3; i < scene.entities.length; i++) {
+			if (scene.entities[i].getType() != Game.entityType.BULLET)
+				continue;
+			
+			for (var j = 0; j < 3; j++) {
+				coll_sq = lib.collidePointSphere(scene.entities[j].getPosition(), scene.entities[i].getPosition(), 50);
+				if (coll_sq > 0) {
+					scene.entities[i].alive = false;
+					if (j == scene.data.player) {
+						health--;
+						scene.uiEntities[health + 1].setSprite(sheet_fx.getSprite(10));
+					} else if (j == 1) {
+						scene.entities[1].health--;
+					}
+				}
+			}
+		}
+	}
+	
+	function combatShoot(id) {
+		var bullet = new Game.physicsEntity(
+			Math.sin(scene.entities[id].getRotation()) * 55 + scene.entities[id].getPosition()[0],
+			Math.cos(scene.entities[id].getRotation()) * -55 + scene.entities[id].getPosition()[1],
+			Math.sin(scene.entities[id].getRotation()) * 12 + scene.entities[id].getMomentum()[0],
+			Math.cos(scene.entities[id].getRotation()) * -12 + scene.entities[id].getMomentum()[1],
+			0,
+			0
+		);
+		
+		bullet.setType(Game.entityType.BULLET);
+		bullet.setSprite(sheet_fx.getSprite(8));
+		bullet.setTimeToLive(90);
+		
+		scene.entities.push(bullet);
 	}
 	
 	/** GALAXY **/
 	function enterGalaxy() {
 		scene.data.player = 0;
-	
-		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
 		
-		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.15, 0.001);
-		scene.entities[0].setSprite(sheet_ship.getSprite(0));
+		scene.data.transitionFrame = -1;
+		scene.data.transitionTarget = -1;
+	
+		scene.camera = new Game.entity(0, 0);
+		scene.camera.setRotation(1);
+		
+		scene.entities[0] = new Game.physicsEntity(100, 100, 0, 0, 0.095, 0.001);
+		scene.entities[0].setSprite(sheet_galship.getSprite(0));
+		
+		for (var i = 0; i < map.planets.length; i++) {
+			scene.entities[i + 1] = new Game.entity(map.planets[i][0], map.planets[i][1], Game.entityType.PLANET);
+			scene.entities[i + 1].setSprite(sheet_galplanets.getSprite(map.planets[i][2]));
+		}
+		
+		for (var i = 0; i < 2; i++) {
+			var ent = new Game.physicsEntity(
+				Math.random() * 800 + 400,
+				Math.random() * 600 + 300,
+				Math.random() * 3 + 1,
+				Math.random() * 3 + 1,
+				0.0, 0.0
+			);
+			ent.setSprite(sheet_galship.getSprite(2));
+			ent.setRotation(2.5);
+			scene.entities.push(ent);
+		}
 	}
 	
 	function updateGalaxy() {
-		// handleInput
+		if (scene.data.transitionFrame < 0) {
+			handleGalaxyInput();	
+			scene.update();
+		} else if (scene.data.transitionFrame == 0) {
+			// TODO: persistency between planet <-> galaxy
+			// transitionTarget
+			
+			scene.data.transitionFrame = -1;
+			scene.camera.setPosition(0, 0);
+			
+			state.push();
+			state.set(State.enum.PLANET, scene.data.target - 1);
+		} else {
+			scene.data.transitionFrame--;
+		}
+		
+		handleGalaxyPhysics();
+	}
+	
+	function handleGalaxyInput() {
+		if (input.isKeyDown(Input.enum.EXIT)) { // Esc
+			state.push();
+			state.set(State.enum.MENU);
+		}
+	
+		if (input.isKeyDown(Input.enum.FORWARD) || input.isKeyDown(Input.enum.UP)) { // W || Up
+			scene.entities[scene.data.player].translate(0.1);
+			scene.entities[scene.data.player].setSprite(sheet_galship.getSprite(1));
+		} else {
+			scene.entities[scene.data.player].setSprite(sheet_galship.getSprite(0));
+		}
+		
+		if (input.isKeyDown(Input.enum.BACKWARD) || input.isKeyDown(Input.enum.DOWN)) { // S || Down
+			scene.entities[scene.data.player].translate(-0.05);
+		}
+		
+		if (input.isKeyDown(Input.enum.TURN_LT) || input.isKeyDown(Input.enum.LEFT)) { // A || Left
+			scene.entities[scene.data.player].rotate(-0.075);
+		}
+		
+		if (input.isKeyDown(Input.enum.TURN_RT) || input.isKeyDown(Input.enum.RIGHT)) { // D || Right
+			scene.entities[scene.data.player].rotate(0.075);
+		}
+	}
+	
+	function handleGalaxyPhysics() {
+		if (scene.data.transitionFrame >= 0) {
+			scene.camera.setRotation(1 / 30 * scene.data.transitionFrame);
+			scene.camera.setPosition(
+				scene.entities[scene.data.target].getPosition()[0],
+				scene.entities[scene.data.target].getPosition()[1]
+			);
+			
+			return;
+		}
+		
+		galaxyWrapAround(scene.data.player);
+	
+		scene.data.target = 0;
+		scene.data.targetDist = -87500; // 300^2 - 50^2
+	
+		// planetary landing
+		for (var i = 1; i < scene.entities.length; i++) {
+			if (scene.entities[i].getType() != Game.entityType.PLANET)
+				continue;
+			
+			var coll_sq = lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[i].getPosition(), 50);
+			
+			if (coll_sq > scene.data.targetDist) {
+				scene.data.target = i;
+				scene.data.targetDist = coll_sq;
+			}
+			
+			if (coll_sq > 0) {
+				scene.entities[scene.data.player].setPosition(
+					scene.entities[i].getPosition()[0],
+					scene.entities[i].getPosition()[1] - 75
+				);
+				scene.entities[scene.data.player].setRotation(0);
+				
+				scene.entities[scene.data.player].applyForce(
+					-scene.entities[scene.data.player].getMomentum()[0],
+					-scene.entities[scene.data.player].getMomentum()[1]
+				);
+				scene.entities[scene.data.player].setSprite(sheet_fx.getSprite(0));
+				
+				scene.data.transitionFrame = 30;
+				scene.data.transitionTarget = i;
+			}
+		}
+		
+		// update floating enemies
+		for (var i = map.planets.length + 1; i < scene.entities.length; i++) {
+			galaxyWrapAround(i);
+			
+			var coll_sq = lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[i].getPosition(), 35);
+			
+			if (coll_sq > 0) {
+				scene.entities[i].setPosition(
+					Math.random() * 2400 - 1200,
+					-900
+				);
+				
+				var planet = -1;
+				if (scene.data.target > 0) {
+					planet = map.planets[scene.data.target - 1][2];
+				}
+				
+				state.push();
+				state.set(State.enum.COMBAT, planet);
+			}
+		}
+		
+		if (scene.data.target > 0) {
+			scene.camera.setRotation(1);
+			scene.camera.setPosition(
+				scene.entities[scene.data.target].getPosition()[0],
+				scene.entities[scene.data.target].getPosition()[1]
+			);
+		} else {
+			scene.camera.setRotation(5);
+			scene.camera.setPosition(0, 0);
+		}
+	}
+	
+	function galaxyWrapAround(id) {
+		if (scene.entities[id].getPosition()[0] < -1200) {
+			scene.entities[id].setPosition(1200, scene.entities[id].getPosition()[1]);
+		} else if (scene.entities[id].getPosition()[0] > 1200) {
+			scene.entities[id].setPosition(-1200, scene.entities[id].getPosition()[1]);
+		} else if (scene.entities[id].getPosition()[1] < -900) {
+			scene.entities[id].setPosition(scene.entities[id].getPosition()[0], 900);
+		} else if (scene.entities[id].getPosition()[1] > 900) {
+			scene.entities[id].setPosition(scene.entities[id].getPosition()[0], -900);
+		}
+	}
+	
+	/** SCORES **/
+	function enterScores() {
+		scene.data.score = -1;
+		scene.data.localScore = score;
+	
+		scene.camera = new Game.entity(0, 0);
+		scene.camera.setRotation(1);
+		
+		scene.entities[0] = new Game.physicsEntity(60, -150, 5, 0, 0.25, 0.01);
+		scene.entities[0].setSprite(sheet_menu.getSprite(2));
+		
+		if (health <= 0) {
+			scene.uiEntities[0] = new Game.entity(285, 75);
+			scene.uiEntities[0].setSprite(sheet_menu.getSprite(3));
+		}
+		
+		$.getJSON("http://aqueous-ravine-5531.herokuapp.com/app/games/712/scores", function(data) {
+			$.each(data, function(i, item) {
+				if (item.score > scene.data.score) {
+					scene.data.score = item.score;
+				}
+			});
+			
+			if (scene.data.score >= 0 && score > scene.data.score) {
+				$.ajax({
+					url: "http://aqueous-ravine-5531.herokuapp.com/app/games/712/scores",
+					dataType: 'json',
+					contentType:'application/json; charset=utf-8',
+					type: 'post',
+					data: JSON.stringify({score: score})
+				});
+			}
+		});
+	}
+	
+	function updateScores() {
+		if (input.isKeyDown(Input.enum.EXIT)
+				|| input.isKeyDown(Input.enum.SELECT)
+				|| input.isKeyDown(Input.enum.ACTION)) {
+			game.newGame();
+		}
+		
+		scene.entities[0].applyGravity([60, -150], 175, 0.2);
 		
 		scene.update();
-		updateCameraPosition();
-		
-		// handlePhysics
 	}
 	
 	/** Helper Functions **/
@@ -439,22 +806,22 @@ Game = (function() {
 	function updateCameraZoom(trackedId) {
 		var x_diff = scene.entities[trackedId].getPosition()[0] - scene.camera.getPosition()[0],
 			y_diff = scene.entities[trackedId].getPosition()[1] - scene.camera.getPosition()[1],
-			dist = Math.sqrt(x_diff * x_diff + y_diff * y_diff) * 0.15;
+			dist = Math.sqrt(x_diff * x_diff + y_diff * y_diff) * 0.20;
 		
 		// slight smoothing
-		if (dist > 100) {
-			dist -= 0.35 * (dist - 100);
+		if (dist > 150) {
+			dist -= 0.35 * (dist - 150);
 		}
 		
-		if (dist > 200) {
-			dist = 200;
+		if (dist > 300) {
+			dist = 300;
 		}
 		
-		scene.camera.setRotation(dist * 0.01);
+		scene.camera.setRotation(1 + dist * 0.01);
 	}
 	
 	function offscreenTracker(trackedId) {
-		var scale = 1 / (1 + scene.camera.getRotation()),
+		var scale = 2 / (1 + scene.camera.getRotation()),
 			x_diff = (scene.entities[trackedId].getPosition()[0] - scene.camera.getPosition()[0]) * scale + 400,
 			y_diff = (scene.entities[trackedId].getPosition()[1] - scene.camera.getPosition()[1]) * scale + 300,
 			offscreen = false;
@@ -490,16 +857,25 @@ Game = (function() {
 	
 		newGame: function() {
 			try {
+				state.clearStack();
 				state.set(State.enum.MENU);
 			} catch (err) {
 				if (err != "state change") {
 					throw err;
 				}
 			}
+			
+			map = new Game.map(6, 7, 6);
+			health = 10;
+			score = 0;
 		},
 		
 		tick: function() {
 			try {
+				if (state.get() != State.enum.SCORES && health <= 0) {
+					state.set(State.enum.SCORES);
+				}
+				
 				switch (state.get()) {
 				case State.enum.MENU:
 					updateMenu();
@@ -515,6 +891,10 @@ Game = (function() {
 				
 				case State.enum.GALAXY:
 					updateGalaxy();
+					break;
+				
+				case State.enum.SCORES:
+					updateScores();
 					break;
 				
 				default:
@@ -577,61 +957,26 @@ Game.scene = function() {
 }
 
 
-Game.map = function(w, h) {
-	var grid = [],
-		width = w,
-		height = h;
+Game.map = function(numPlanets, avgOres, avgDanger) {
+	this.planets = []; // x, y, type, ores, danger
 	
-	for (var x = 0; x < width; x++) {
-		for (var y = 0; y < height; y++) {
-			grid[x + y * width] = 0;
-		}
-	}
-	
-	// Private Methods
-	function xyToGrid(x, y) {
-		if (x >= 0 && x < width && y >= 0 && y < height) {
-			return (x + y * width);
-		}
-		
-		return -1;
-	}
-	
-	// Public Methods
-	this.get = function(x, y) {
-		var i = xyToGrid(x, y);
-		
-		if (i < 0) {
-			return 0;
-		} else {
-			return grid[i];
-		}
-	}
-	
-	this.set = function(x, y, val) {
-		var i = xyToGrid(x, y);
-		
-		if (i >= 0) {
-			grid[i] = val;
-		} else {
-			console.log("game.map.set with invalid coords: (" + x + "," + y + ")");
-		}
-	}
-	
-	this.getWidth = function() {
-		return width;
-	}
-	
-	this.getHeight = function() {
-		return height;
+	for (var i = 0; i < numPlanets; i++) {
+		this.planets[i] = [
+			Math.random() * 2250 - 1125,
+			i * (1650 / numPlanets) + Math.random() * 150 - 825,
+			i % 3,
+			Math.floor(Math.random() * avgOres + avgOres / 2),
+			Math.floor(Math.random() * avgDanger + avgDanger / 2)
+		];
 	}
 };
 
 
-Game.entity = function(x, y, type, id) {
+Game.entity = function(x, y, _type, id) {
 	var pos = [x, y],
 		rot = 0,
-		img = null;
+		img = null,
+		type = _type;
 	
 	// entities with alive == false will be culled during each tick
 	this.alive = true;
@@ -675,6 +1020,10 @@ Game.entity = function(x, y, type, id) {
 		img = sprite;
 	}
 	
+	this.setType = function(_type) {
+		type = _type;
+	}
+	
 	this.getPosition = function() {
 		return pos;
 	}
@@ -701,7 +1050,10 @@ Game.entity = function(x, y, type, id) {
 Game.entityType = {
 	NULL: 0, // normal entity
 	STATIC: 1,// no updates
-	ITEM: 2 // collectible item
+	ITEM: 2, // collectible item
+	PLANET: 3, // landable planet
+	DANGER: 4, // damaging obstacle
+	BULLET: 5 // damaging entity, destroyed on collision
 };
 
 
@@ -814,9 +1166,10 @@ Game.physicsEntity = function(x, y, x_mom, y_mom, dissipation, decay) {
 	this.translate = ent.translate;
 	this.strafe = ent.strafe;
 	this.rotate = ent.rotate;
-	
+
 	this.setRotation = ent.setRotation;
 	this.setSprite = ent.setSprite;
+	this.setType = ent.setType;
 	
 	this.getRotation = ent.getRotation;
 	this.getSprite = ent.getSprite;

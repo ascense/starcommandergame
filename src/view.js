@@ -29,12 +29,13 @@ var View = (function() {
 		}
 		
 		var cam = scene.camera.getPosition(),
-			width = scene.background.getWidth(),
-			height = scene.background.getHeight(),
+			scale = 2 / (1 + scene.camera.getRotation()),
+			width = scene.background.getWidth() * scale,
+			height = scene.background.getHeight() * scale,
 			x_offs = (width - canvas.width) / 2,
 			y_offs = (height - canvas.height) / 2,
-			x_start = (-cam[0] - x_offs) % width,
-			y_start = (-cam[1] - y_offs) % height;
+			x_start = (-cam[0] * scale - x_offs) % width,
+			y_start = (-cam[1] * scale - y_offs) % height;
 		
 		if (x_start > 0) {
 			x_start -= width;
@@ -53,7 +54,7 @@ var View = (function() {
 	function drawScene(scene) {
 		var ents = scene.entities,
 			cam = scene.camera,
-			scale = 1 / (1 + cam.getRotation());
+			scale = 2 / (1 + cam.getRotation());
 		
 		context.translate(-cam.getPosition()[0] * scale, -cam.getPosition()[1] * scale);
 		
@@ -75,6 +76,22 @@ var View = (function() {
 		
 		for (var i = 0; i < ents.length; i++) {
 			drawUIEntity(ents[i]);
+		}
+		
+		// TODO: fix this hack ):
+		if (state.get() == State.enum.SCORES) {
+			context.font = "20pt Arial";
+			context.fillStyle = "#800627";
+			
+			context.fillText("Current Game Score:", 220, 275);
+			context.fillText(scene.data.localScore, 525, 275);
+			
+			context.fillText("Global High Score:", 220, 325);
+			if (scene.data.score > -1) {
+				context.fillText(scene.data.score, 525, 325);
+			} else {
+				context.fillText("...", 525, 325);
+			}
 		}
 	}
 	

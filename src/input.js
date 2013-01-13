@@ -1,5 +1,8 @@
 /**
 * = Input Module =
+*
+* Input
+*  - Input.enum
 */
 
 
@@ -31,6 +34,14 @@ var Input = (function() {
 		tick: function() {
 		},
 		
+		clear: function() {
+			for (var i = 0; i < keys.length; i++) {
+				if (keys[i]) {
+					keys[i] = false;
+				}
+			}
+		},
+		
 		isKeyDown: function(key) {
 			if (keys[key]) {
 				return keys[key];
@@ -42,3 +53,19 @@ var Input = (function() {
 	
 	return _input;
 })();
+
+
+Input.enum = {
+	FORWARD: 87, // W
+	BACKWARD: 83, // S
+	TURN_LT: 65, // A
+	TURN_RT: 68, // D
+	UP: 38, // Up
+	DOWN: 40, // Down
+	LEFT: 37, // Left
+	RIGHT: 39, // Right
+	BOOST: 16, // Shift
+	ACTION: 32, // Space
+	SELECT: 13, // Enter
+	EXIT: 27 // Esc
+}

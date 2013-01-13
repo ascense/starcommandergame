@@ -34,7 +34,7 @@ State = (function() {
 			return current;
 		},
 		
-		set: function(new_state) {
+		set: function(new_state, vars) {
 			if (new_state < 0 || new_state >= callback.length)
 				throw "Invalid state change: " + new_state;
 			
@@ -43,15 +43,21 @@ State = (function() {
 			
 			if (callback[new_state]) {
 				for (var i = 0; i < callback[new_state].length; i++) {
-					callback[new_state][i]();
+					callback[new_state][i](vars);
 				}
 			}
+			
+			input.clear();
 			
 			throw "state change";
 		},
 		
 		push: function() {
 			stack.push([current, game.getScene()]);
+			
+			if (stack.length >= State.enum.STATE_COUNT) {
+				throw "State stack overflow!";
+			}
 		},
 		
 		pop: function() {
@@ -62,6 +68,8 @@ State = (function() {
 		
 			current = state[0];
 			game.setScene(state[1]);
+		
+			input.clear();
 		
 			throw "state change";
 		},
@@ -86,5 +94,6 @@ State.enum = {
 	PLANET : 1,
 	COMBAT : 2,
 	GALAXY : 3,
-	STATE_COUNT: 4 // "sentry" entry
+	SCORES : 4,
+	STATE_COUNT: 5 // "sentry" entry
 }
