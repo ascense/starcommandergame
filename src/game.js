@@ -604,12 +604,10 @@ Game = (function() {
 			var ent = new Game.physicsEntity(
 				Math.random() * 800 + 400,
 				Math.random() * 600 + 300,
-				Math.random() * 3 + 1,
-				Math.random() * 3 + 1,
-				0.0, 0.0
+				0, 0, 0.0, 0.002
 			);
 			ent.setSprite(sheet_galship.getSprite(2));
-			ent.setRotation(2.5);
+			ent.setRotation(Math.random() * 6.28);
 			scene.entities.push(ent);
 		}
 	}
@@ -710,6 +708,32 @@ Game = (function() {
 		for (var i = map.planets.length + 1; i < scene.entities.length; i++) {
 			galaxyWrapAround(i);
 			
+			// flight direction
+			var offset = [
+				scene.entities[i].getPosition()[0] - scene.entities[scene.data.player].getPosition()[0],
+				scene.entities[i].getPosition()[1] - scene.entities[scene.data.player].getPosition()[1]
+			];
+			
+			scene.entities[i].setSprite(sheet_galship.getSprite(2));
+			if (offset[0] * offset[0] + offset[1] * offset[1] < 40000) {
+				var dot = lib.vecDotProduct(
+					[Math.sin(scene.entities[i].getRotation() + Math.PI * 1.5),
+					-Math.cos(scene.entities[i].getRotation() + Math.PI * 1.5)],
+					lib.vecNormalize(offset)
+				);
+
+				if (dot > 0.2) {
+					scene.entities[i].rotate(0.075);
+				} else if (dot < -0.2) {
+					scene.entities[i].rotate(-0.075);
+				} else {
+					scene.entities[i].translate(0.2);
+					scene.entities[i].setSprite(sheet_galship.getSprite(3));
+				}
+			} else {
+				scene.entities[i].translate(0.05);
+			}
+			
 			var coll_sq = lib.collidePointSphere(scene.entities[scene.data.player].getPosition(), scene.entities[i].getPosition(), 35);
 			
 			if (coll_sq > 0) {
@@ -728,16 +752,37 @@ Game = (function() {
 			}
 		}
 		
+		// camera focus changes
+		var rot_target,
+			x_target,
+			y_target;
+		
 		if (scene.data.target > 0) {
-			scene.camera.setRotation(1);
-			scene.camera.setPosition(
-				scene.entities[scene.data.target].getPosition()[0],
-				scene.entities[scene.data.target].getPosition()[1]
-			);
+			rot_target = 1;
+			x_target = scene.entities[scene.data.target].getPosition()[0];
+			y_target = scene.entities[scene.data.target].getPosition()[1];
 		} else {
-			scene.camera.setRotation(5);
-			scene.camera.setPosition(0, 0);
+			rot_target = 5;
+			x_target = 0;
+			y_target = 0;
 		}
+		
+		if (scene.camera.getRotation() < rot_target - 0.25) {
+			scene.camera.setRotation(scene.camera.getRotation() + 0.25);
+		} else if (scene.camera.getRotation() > rot_target + 0.25) {
+			scene.camera.setRotation(scene.camera.getRotation() - 0.25);
+		} else {
+			scene.camera.setRotation(rot_target);
+		}
+		
+		if (Math.abs(scene.camera.getPosition()[0] - x_target) > 5) {
+			x_target = scene.camera.getPosition()[0] - (scene.camera.getPosition()[0] - x_target) / 10;
+		}
+		if (Math.abs(scene.camera.getPosition()[1] - y_target) > 5) {
+			y_target = scene.camera.getPosition()[1] - (scene.camera.getPosition()[1] - y_target) / 10;
+		}
+		
+		scene.camera.setPosition(x_target, y_target);
 	}
 	
 	function galaxyWrapAround(id) {

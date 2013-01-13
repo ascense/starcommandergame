@@ -1,6 +1,6 @@
 // -- Globals --
 
-var SC_VERSION = "1.0";
+var SC_VERSION = "1.01";
 
 var view,
 	state,
