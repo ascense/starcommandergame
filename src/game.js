@@ -417,6 +417,7 @@ Game = (function() {
 		
 		scene.entities[1] = new Game.physicsEntity(200, -200, 0, 0, 0.15, 0.001);
 		scene.entities[1].setSprite(sheet_ship.getSprite(2));
+		scene.entities[1].setRotation(3.14);
 		scene.entities[1].health = 10;
 		
 		scene.entities[2] = new Game.entity(0, 0, Game.entityType.PLANET);
@@ -515,31 +516,35 @@ Game = (function() {
 		
 		// enemy position
 		var offset = [
-			scene.entities[1].getPosition()[0] - scene.entities[scene.data.player].getPosition()[0],
-			scene.entities[1].getPosition()[1] - scene.entities[scene.data.player].getPosition()[1]
+			scene.entities[scene.data.player].getPosition()[0] - scene.entities[1].getPosition()[0],
+			scene.entities[scene.data.player].getPosition()[1] - scene.entities[1].getPosition()[1]
 		];
+		var normOffset = lib.vecNormalize(offset);
 		
-		var dot = lib.vecDotProduct(
-			[Math.sin(scene.entities[1].getRotation() + Math.PI * 1.5),
-			-Math.cos(scene.entities[1].getRotation() + Math.PI * 1.5)],
-			lib.vecNormalize(offset)
-		);
-
+		var dir = Math.atan2(normOffset[1], normOffset[0]);
+		
+		dir = (dir + Math.PI / 2) % 6.28;
+		if (dir < 0) {
+			dir += 2 * Math.PI;
+		}
+		
+		dir = (dir - scene.entities[1].getRotation() - Math.PI) % 6.28;
+		if (dir < 0) {
+			dir += 2 * Math.PI;
+		}
+		
 		scene.entities[1].setSprite(sheet_ship.getSprite(2));
-		if (dot > 0.2) {
-			scene.entities[1].rotate(0.075);
-		} else if (dot < -0.2) {
+		if (dir < Math.PI - 0.2) {
 			scene.entities[1].rotate(-0.075);
+		} else if (dir > Math.PI + 0.2) {
+			scene.entities[1].rotate(0.075);
 		} else {
 			if (offset[0] * offset[0] + offset[1] * offset[1] > 15000) {
 				scene.entities[1].translate(0.2);
 				scene.entities[1].setSprite(sheet_ship.getSprite(3));
-			} else {
-				// (mostly) negative translation, to keep some distance
-				scene.entities[1].translate(0.05 - Math.abs(dot));
 			}
 			
-			if (Math.abs(dot) <= 0.15 && scene.data.enemyShootTimer == 0) {
+			if (Math.abs(dir - Math.PI) <= 0.15 && scene.data.enemyShootTimer == 0) {
 				combatShoot(1);
 				scene.data.enemyShootTimer = 15;
 			}
@@ -600,10 +605,10 @@ Game = (function() {
 			scene.entities[i + 1].setSprite(sheet_galplanets.getSprite(map.planets[i][2]));
 		}
 		
-		for (var i = 0; i < 2; i++) {
+		for (var i = 0; i < 3; i++) {
 			var ent = new Game.physicsEntity(
-				Math.random() * 800 + 400,
-				Math.random() * 600 + 300,
+				Math.random() * 1200 + 200,
+				Math.random() * 900 + 150,
 				0, 0, 0.0, 0.002
 			);
 			ent.setSprite(sheet_galship.getSprite(2));
@@ -715,7 +720,7 @@ Game = (function() {
 			];
 			
 			scene.entities[i].setSprite(sheet_galship.getSprite(2));
-			if (offset[0] * offset[0] + offset[1] * offset[1] < 40000) {
+			if (offset[0] * offset[0] + offset[1] * offset[1] < 100000) {
 				var dot = lib.vecDotProduct(
 					[Math.sin(scene.entities[i].getRotation() + Math.PI * 1.5),
 					-Math.cos(scene.entities[i].getRotation() + Math.PI * 1.5)],
@@ -808,11 +813,6 @@ Game = (function() {
 		scene.entities[0] = new Game.physicsEntity(60, -150, 5, 0, 0.25, 0.01);
 		scene.entities[0].setSprite(sheet_menu.getSprite(2));
 		
-		if (health <= 0) {
-			scene.uiEntities[0] = new Game.entity(285, 75);
-			scene.uiEntities[0].setSprite(sheet_menu.getSprite(3));
-		}
-		
 		$.getJSON("http://aqueous-ravine-5531.herokuapp.com/app/games/712/scores", function(data) {
 			$.each(data, function(i, item) {
 				if (item.score > scene.data.score) {
@@ -902,6 +902,14 @@ Game = (function() {
 	}
 	
 	
+	function gameOver() {
+		var text = new Game.entity(285, 75);
+		text.setSprite(sheet_menu.getSprite(3));
+		
+		scene.uiEntities.push(text);
+	}
+	
+	
 	// Prototype
 	_game.prototype = {
 		constructor: _game,
@@ -924,7 +932,16 @@ Game = (function() {
 		tick: function() {
 			try {
 				if (state.get() != State.enum.SCORES && health <= 0) {
-					state.set(State.enum.SCORES);
+					if (!scene.data.gameOverTime) {
+						scene.data.gameOverTime = 1;
+						gameOver();
+					} else if (scene.data.gameOverTime > 180) {
+						state.set(State.enum.SCORES);
+					} else {
+						scene.data.gameOverTime++;
+					}
+					
+					return;
 				}
 				
 				switch (state.get()) {
