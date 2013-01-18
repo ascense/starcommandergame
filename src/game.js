@@ -271,23 +271,16 @@ Game = (function() {
 				scene.data.burnTimer = 300;
 			} else if (scene.data.burnTimer > 255) {
 				scene.entities[scene.data.player].translate(1.5);
-			
-				// particle fx
-				var smoke = new Game.physicsEntity(
+				particleFX(
 					scene.entities[scene.data.player].getPosition()[0],
 					scene.entities[scene.data.player].getPosition()[1],
 					Math.sin(scene.entities[scene.data.player].getRotation()) * -5
-					 + scene.entities[scene.data.player].getMomentum()[0] + Math.random() * 3 - 1.5,
+					 + scene.entities[scene.data.player].getMomentum()[0],
 					Math.cos(scene.entities[scene.data.player].getRotation()) * 5
-					 + scene.entities[scene.data.player].getMomentum()[1] + Math.random() * 3 - 1.5,
-					0,
-					0
+					 + scene.entities[scene.data.player].getMomentum()[1],
+					3, 20,
+					sheet_fx.getSprite(4)
 				);
-				
-				smoke.setSprite(sheet_fx.getSprite(4));
-				smoke.setTimeToLive(20);
-				
-				scene.entities.push(smoke);
 			}
 		}
 		
@@ -408,16 +401,18 @@ Game = (function() {
 		scene.data.selected = 1;
 		scene.data.shootTimer = 0;
 		scene.data.enemyShootTimer = 0;
+		scene.data.transitionFrame = -1;
 		
 		scene.camera = new Game.physicsEntity(0, 0, 0, 0, 0.25, 0.05);
 		scene.camera.setRotation(1);
 	
-		scene.entities[0] = new Game.physicsEntity(200, 200, 0, 0, 0.15, 0.001);
+		scene.entities[0] = new Game.physicsEntity(0, 200, -5, 0, 0.15, 0.001);
 		scene.entities[0].setSprite(sheet_ship.getSprite(0));
+		scene.entities[0].setRotation(4.69);
 		
-		scene.entities[1] = new Game.physicsEntity(200, -200, 0, 0, 0.15, 0.001);
-		scene.entities[1].setSprite(sheet_ship.getSprite(2));
-		scene.entities[1].setRotation(3.14);
+		scene.entities[1] = new Game.physicsEntity(0, -200, 5, 0, 0.15, 0.001);
+		scene.entities[1].setSprite(sheet_ship.getSprite(3));
+		scene.entities[1].setRotation(1.55);
 		scene.entities[1].health = 10;
 		
 		scene.entities[2] = new Game.entity(0, 0, Game.entityType.PLANET);
@@ -438,7 +433,13 @@ Game = (function() {
 	}
 	
 	function updateCombat() {
-		handleCombatInput();
+		if (scene.data.transitionFrame > 0) {
+			scene.data.transitionFrame--;
+		} else if (scene.data.transitionFrame == 0) {
+			state.pop();
+		} else {
+			handleCombatInput();
+		}
 		
 		scene.update();
 		updateCameraPosition(0.05);
@@ -450,8 +451,53 @@ Game = (function() {
 		
 		// win condition
 		if (scene.entities[1].health <= 0) {
-			score += 10;
-			state.pop();
+			// smoke
+			particleFX(
+				scene.entities[1].getPosition()[0],
+				scene.entities[1].getPosition()[1],
+				scene.entities[1].getMomentum()[0],
+				scene.entities[1].getMomentum()[1],
+				3, 60,
+				sheet_fx.getSprite(4)
+			);
+			// fire
+			particleFX(
+				scene.entities[1].getPosition()[0],
+				scene.entities[1].getPosition()[1],
+				scene.entities[1].getMomentum()[0],
+				scene.entities[1].getMomentum()[1],
+				5, 15,
+				sheet_fx.getSprite(11)
+			);
+			
+			if (scene.data.transitionFrame < 0) {
+				score += 10;
+				scene.data.transitionFrame = 60;
+				scene.entities[1].setSprite(sheet_ship.getSprite(5));
+			}
+		} else if (health <= 0) {
+			// smoke
+			particleFX(
+				scene.entities[scene.data.player].getPosition()[0],
+				scene.entities[scene.data.player].getPosition()[1],
+				scene.entities[scene.data.player].getMomentum()[0],
+				scene.entities[scene.data.player].getMomentum()[1],
+				3, 60,
+				sheet_fx.getSprite(4)
+			);
+			// fire
+			particleFX(
+				scene.entities[scene.data.player].getPosition()[0],
+				scene.entities[scene.data.player].getPosition()[1],
+				scene.entities[scene.data.player].getMomentum()[0],
+				scene.entities[scene.data.player].getMomentum()[1],
+				5, 15,
+				sheet_fx.getSprite(11)
+			);
+			
+			if (scene.data.transitionFrame < 0) {
+				scene.entities[scene.data.player].setSprite(sheet_ship.getSprite(2));
+			}
 		}
 	}
 	
@@ -515,9 +561,14 @@ Game = (function() {
 		}
 		
 		// enemy position
+		// TODO: frame prediction adjusted by difficulty (lower prediction = easier combat)
+		var predictFrames = 15;
+		
 		var offset = [
-			scene.entities[scene.data.player].getPosition()[0] - scene.entities[1].getPosition()[0],
-			scene.entities[scene.data.player].getPosition()[1] - scene.entities[1].getPosition()[1]
+			scene.entities[scene.data.player].getPosition()[0] + scene.entities[scene.data.player].getMomentum()[0] * predictFrames
+			 - scene.entities[1].getPosition()[0] - scene.entities[1].getMomentum()[0] * predictFrames,
+			scene.entities[scene.data.player].getPosition()[1] + scene.entities[scene.data.player].getMomentum()[1] * predictFrames
+			 - scene.entities[1].getPosition()[1] - scene.entities[1].getMomentum()[1] * predictFrames
 		];
 		var normOffset = lib.vecNormalize(offset);
 		
@@ -533,7 +584,7 @@ Game = (function() {
 			dir += 2 * Math.PI;
 		}
 		
-		scene.entities[1].setSprite(sheet_ship.getSprite(2));
+		scene.entities[1].setSprite(sheet_ship.getSprite(3));
 		if (dir < Math.PI - 0.2) {
 			scene.entities[1].rotate(-0.075);
 		} else if (dir > Math.PI + 0.2) {
@@ -541,7 +592,7 @@ Game = (function() {
 		} else {
 			if (offset[0] * offset[0] + offset[1] * offset[1] > 15000) {
 				scene.entities[1].translate(0.2);
-				scene.entities[1].setSprite(sheet_ship.getSprite(3));
+				scene.entities[1].setSprite(sheet_ship.getSprite(4));
 			}
 			
 			if (Math.abs(dir - Math.PI) <= 0.15 && scene.data.enemyShootTimer == 0) {
@@ -864,8 +915,8 @@ Game = (function() {
 			dist -= 0.35 * (dist - 150);
 		}
 		
-		if (dist > 300) {
-			dist = 300;
+		if (dist > 400) {
+			dist = 400;
 		}
 		
 		scene.camera.setRotation(1 + dist * 0.01);
@@ -901,6 +952,19 @@ Game = (function() {
 		}
 	}
 	
+	function particleFX(x, y, x_momentum, y_momentum, randomness, ttl, sprite) {
+		var fx = new Game.physicsEntity(
+			x, y,
+			x_momentum + Math.random() * randomness - (randomness / 2),
+			y_momentum + Math.random() * randomness - (randomness / 2),
+			0, 0
+		);
+		
+		fx.setSprite(sprite);
+		fx.setTimeToLive(ttl);
+		
+		scene.entities.push(fx);
+	}
 	
 	function gameOver() {
 		var text = new Game.entity(285, 75);
@@ -940,8 +1004,6 @@ Game = (function() {
 					} else {
 						scene.data.gameOverTime++;
 					}
-					
-					return;
 				}
 				
 				switch (state.get()) {
