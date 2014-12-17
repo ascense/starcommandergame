@@ -150,7 +150,7 @@ Game = (function() {
 		scene.data.player = 0;
 		
 		scene.data.tracker = 2;
-		scene.data.burnTimer = 15;
+		scene.data.burnMeter = 50;
 		
 		scene.data.transitionFrame = -60;
 		
@@ -188,18 +188,33 @@ Game = (function() {
 			scene.entities[i + 1].offset = 2.5 * i;
 		}
 		
-		// health
-		for (var i = 1; i <= 10; i++) {
-			scene.uiEntities[i + 2] = new Game.entity(i * 8, 585, Game.entityType.STATIC);
-			if (health < i) {
-				scene.uiEntities[i + 2].setSprite(sheet_fx.getSprite(10));
+		// health meter
+		scene.data.healthStart = scene.uiEntities.length;
+		for (var i = 0; i < 10; i++) {
+			scene.uiEntities[scene.data.healthStart + i] = new Game.entity(
+                    i * 8 + 8, 585, Game.entityType.STATIC);
+			if (health < i + 1) {
+				scene.uiEntities[scene.data.healthStart + i].setSprite(sheet_fx.getSprite(10));
 			} else {
-				scene.uiEntities[i + 2].setSprite(sheet_fx.getSprite(9));
+				scene.uiEntities[scene.data.healthStart + i].setSprite(sheet_fx.getSprite(9));
+			}
+		}
+		
+		// burn meter
+		scene.data.burnStart = scene.uiEntities.length;
+		for (var i = 0; i < 5; i++) {
+			scene.uiEntities[scene.data.burnStart + i] = new Game.entity(
+                    i * 8 + 8, 575, Game.entityType.STATIC);
+			if (scene.data.burnMeter / 20 <= i) {
+				scene.uiEntities[scene.data.burnStart + i].setSprite(sheet_fx.getSprite(13));
+			} else {
+				scene.uiEntities[scene.data.burnStart + i].setSprite(sheet_fx.getSprite(12));
 			}
 		}
 		
 		// ores
 		scene.data.oreStart = scene.entities.length;
+        scene.data.oreUIStart = scene.uiEntities.length;
 		for (var i = 0; i < map.planets[scene.data.planetId][3]; i++) {
 			scene.entities[scene.data.oreStart + i] = new Game.entity(
 				Math.random() * 2380 - 1190,
@@ -209,13 +224,13 @@ Game = (function() {
 			);
 			scene.entities[scene.data.oreStart + i].setSprite(sheet_ore.getSprite(i % 6));
 			
-			scene.uiEntities[i + 13] = new Game.entity(
+			scene.uiEntities[i + scene.data.oreUIStart] = new Game.entity(
 				685 + scene.entities[scene.data.oreStart + i].getPosition()[0] / 10,
 				550 + scene.entities[scene.data.oreStart + i].getPosition()[1] / 10
 			);
-			scene.uiEntities[i + 13].setSprite(sheet_ore.getSprite(i % 3 + 6));
+			scene.uiEntities[i + scene.data.oreUIStart].setSprite(sheet_ore.getSprite(i % 3 + 6));
 			
-			scene.entities[scene.data.oreStart + i].uiLink = scene.uiEntities[i + 13];
+			scene.entities[scene.data.oreStart + i].uiLink = scene.uiEntities[i + scene.data.oreUIStart];
 		}
 	}
 	
@@ -262,14 +277,9 @@ Game = (function() {
 			scene.entities[scene.data.player].rotate(0.05);
 		}
 		
-		if (scene.data.burnTimer > 0) {
-			scene.data.burnTimer--;
-		}
-		
 		if (input.isKeyDown(Input.enum.BOOST)) {
-			if (scene.data.burnTimer == 0) {
-				scene.data.burnTimer = 300;
-			} else if (scene.data.burnTimer > 255) {
+			if (scene.data.burnMeter > 0) {
+				scene.data.burnMeter--;
 				scene.entities[scene.data.player].translate(1.5);
 				particleFX(
 					scene.entities[scene.data.player].getPosition()[0],
@@ -282,6 +292,8 @@ Game = (function() {
 					sheet_fx.getSprite(4)
 				);
 			}
+		} else if (scene.data.burnMeter < 100) {
+			scene.data.burnMeter++;
 		}
 		
 		if (input.isKeyDown(Input.enum.ACTION) || input.isKeyDown(Input.enum.SELECT)) {
@@ -300,7 +312,7 @@ Game = (function() {
 				if (scene.data.transitionFrame == -1) {
 					health--;
 					scene.data.transitionFrame = -6;
-					scene.uiEntities[health + 3].setSprite(sheet_fx.getSprite(10));
+					scene.uiEntities[scene.data.healthStart + health].setSprite(sheet_fx.getSprite(10));
 				}
 			}
 			
@@ -368,6 +380,15 @@ Game = (function() {
 			685 + scene.entities[scene.data.player].getPosition()[0] / 10,
 			550 + scene.entities[scene.data.player].getPosition()[1] / 10
 		);
+		
+		// boost meter
+		for (var i = 0; i < 5; i++) {
+			if (scene.data.burnMeter / 20 <= i) {
+				scene.uiEntities[scene.data.burnStart + i].setSprite(sheet_fx.getSprite(13));
+			} else {
+				scene.uiEntities[scene.data.burnStart + i].setSprite(sheet_fx.getSprite(12));
+			}
+		}
 		
 		// ore collision
 		for (var i = scene.data.oreStart; i < scene.entities.length; i++) {
